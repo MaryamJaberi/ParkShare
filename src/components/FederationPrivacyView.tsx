@@ -465,7 +465,13 @@ export const FederationPrivacyView: React.FC<Props> = ({
                   <tr key={c.id} className="hover:bg-slate-50/70">
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-slate-900 text-sm">{lang === 'fa' ? c.nameFa : c.name}</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">{c.dataResidencyRegion}</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        {c.dataResidencyRegion === 'محیط خصوصی و رمزگذاری‌شده ساختمان'
+                          ? t(lang, 'محیط خصوصی و رمزگذاری‌شده ساختمان', 'Private Encrypted Building Tenant')
+                          : c.dataResidencyRegion === 'Private Encrypted Building Tenant'
+                          ? t(lang, 'محیط خصوصی و رمزگذاری‌شده ساختمان', 'Private Encrypted Building Tenant')
+                          : c.dataResidencyRegion}
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600">
                       <span className="inline-flex items-center gap-1">

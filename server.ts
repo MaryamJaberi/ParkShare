@@ -1478,20 +1478,77 @@ async function startServer() {
     const { option, requesterId, anonymousBooking, networkOffline, pseudonymousLabel } = req.body ?? {};
     const targetUserId = req.session!.role === 'resident' ? req.session!.userId : requesterId;
     const requester = store.users.find((u) => u.id === targetUserId);
-    if (!requester || !option) {
+    if (!requester || !option || !Array.isArray(option.segments) || option.segments.length === 0) {
       res.status(400).json({ ok: false, messageFa: 'پروفایل کاربر یا گزینه رزرو یافت نشد.', messageEn: 'Invalid booking request.' });
       return;
     }
-    if (req.session!.role === 'manager') {
-      const ownedIds = getManagerCommunityIds(req.session!.accountId);
-      if (!requester.communityId || !ownedIds.has(requester.communityId)) {
-        res.status(403).json({ ok: false, messageFa: 'دسترسی غیرمجاز به این ساختمان.', messageEn: 'Forbidden.' });
-        return;
-      }
+
+    const ownedIds = req.session!.role === 'manager' ? getManagerCommunityIds(req.session!.accountId) : null;
+    if (ownedIds && (!requester.communityId || !ownedIds.has(requester.communityId))) {
+      res.status(403).json({ ok: false, messageFa: 'دسترسی غیرمجاز به این ساختمان.', messageEn: 'Forbidden.' });
+      return;
     }
 
+    // Never trust client-supplied resource/community objects: always hydrate authoritative records from store
+    const hydratedSegments = [];
+    for (const seg of option.segments) {
+      const resourceId = typeof seg?.resource?.id === 'string' ? seg.resource.id : '';
+      const startMin = Number(seg?.startMin);
+      const endMin = Number(seg?.endMin);
+      if (
+        !resourceId ||
+        !Number.isFinite(startMin) ||
+        !Number.isFinite(endMin) ||
+        startMin < 0 ||
+        endMin > 1440 ||
+        startMin >= endMin
+      ) {
+        res.status(400).json({ ok: false, messageFa: 'بازه زمانی یا شناسه پارکینگ نامعتبر است.', messageEn: 'Invalid segment resource or time range.' });
+        return;
+      }
+
+      const authResource = store.resources.find((r) => r.id === resourceId);
+      if (!authResource) {
+        res.status(404).json({ ok: false, messageFa: 'پارکینگ انتخاب‌شده در سامانه یافت نشد.', messageEn: 'Requested parking resource not found.' });
+        return;
+      }
+
+      const authCommunity = store.communities.find((c) => c.id === authResource.communityId);
+      if (!authCommunity) {
+        res.status(404).json({ ok: false, messageFa: 'ساختمان مرتبط با پارکینگ یافت نشد.', messageEn: 'Associated building not found.' });
+        return;
+      }
+
+      if (ownedIds && !ownedIds.has(authCommunity.id)) {
+        const requesterHome = store.communities.find((c) => c.id === requester.communityId);
+        const isAllowedFederated =
+          Boolean(requesterHome?.federationEnabled) &&
+          Boolean(authCommunity.federationEnabled) &&
+          Boolean(requesterHome?.connectedCommunityIds.includes(authCommunity.id));
+        if (!isAllowedFederated) {
+          res.status(403).json({ ok: false, messageFa: 'دسترسی غیرمجاز به پارکینگ ساختمان دیگر.', messageEn: 'Forbidden: resource belongs to another building.' });
+          return;
+        }
+      }
+
+      hydratedSegments.push({
+        resource: authResource,
+        community: authCommunity,
+        startMin,
+        endMin,
+        isFederated: authCommunity.id !== requester.communityId,
+        policyDecision: 'Allowed' as const,
+      });
+    }
+
+    const sanitizedOption = {
+      ...option,
+      segments: hydratedSegments,
+      requiresManualApproval: hydratedSegments.some((s) => s.resource.approvalMode === 'manual'),
+    };
+
     const outcome = createAtomicBooking(
-      option,
+      sanitizedOption,
       requester,
       store.reservations,
       store.communities,
@@ -1530,23 +1587,57 @@ async function startServer() {
   });
 
   // 16. Authenticated: Transition Reservation Status
+  const VALID_RESERVATION_STATUSES = new Set<ReservationStatus>([
+    'Draft',
+    'Pending',
+    'Confirmed',
+    'Active',
+    'Completed',
+    'Cancelled',
+    'Expired',
+    'Disputed',
+    'Relocation Pending',
+  ]);
+
   app.patch('/api/bookings/:id/status', requireAuth, (req: AuthedRequest, res) => {
     const target = store.reservations.find((r) => r.id === req.params.id);
     if (!target) {
       res.status(404).json({ error: 'Reservation not found' });
       return;
     }
+
+    const nextStatus = req.body?.status as ReservationStatus;
+    if (!VALID_RESERVATION_STATUSES.has(nextStatus)) {
+      res.status(400).json({
+        errorFa: 'وضعیت رزرو نامعتبر است.',
+        errorEn: 'Invalid reservation status.',
+      });
+      return;
+    }
+
     if (req.session!.role === 'manager') {
       const ownedIds = getManagerCommunityIds(req.session!.accountId);
       if (!ownedIds.has(target.communityId)) {
         res.status(403).json({ error: 'Forbidden' });
         return;
       }
-    } else if (target.requesterId !== req.session!.userId) {
+    } else if (req.session!.role === 'resident') {
+      if (target.requesterId !== req.session!.userId) {
+        res.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+      if (nextStatus !== 'Cancelled') {
+        res.status(403).json({
+          errorFa: 'ساکنین فقط مجاز به لغو رزرو خود هستند؛ تأیید رزرو صرفاً توسط مالک یا مدیر انجام می‌شود.',
+          errorEn: 'Residents may only cancel their own reservations; confirmation requires owner or manager approval.',
+        });
+        return;
+      }
+    } else if (req.session!.role !== 'super_admin') {
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-    const nextStatus = req.body.status as ReservationStatus;
+
     store.reservations = store.reservations.map((r) =>
       r.id === target.id ? { ...r, status: nextStatus } : r
     );

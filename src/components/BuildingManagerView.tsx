@@ -939,7 +939,7 @@ export const BuildingManagerView: React.FC<Props> = ({
 
       {/* Focused Sub-Navigation Tabs (Eliminates endless scrolling on desktop & mobile!) */}
       <div className="border-b border-slate-200 -mx-4 px-4 sm:mx-0 sm:px-0">
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-px">
+        <div className="flex flex-wrap items-center gap-1 pb-px">
           {sectionTabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeSection === tab.id;
