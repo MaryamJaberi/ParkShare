@@ -1,0 +1,8 @@
+{
+  "name": "ParkShare — Federated Shared Resource Network",
+  "description": "Federated platform for shared resources, data-sovereign community management, 7-engine smart matching, scheduling optimization, and city route-aware discovery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
