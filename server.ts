@@ -71,7 +71,7 @@ interface ParkShareStore {
   notifications: NotificationEvent[];
 }
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = path.resolve(process.env.DATA_DIR || path.resolve(process.cwd(), 'data'));
 const STORE_PATH = path.resolve(DATA_DIR, 'parkshare-store.json');
 
 function createEmptyStore(): ParkShareStore {
@@ -2101,7 +2101,7 @@ async function startServer() {
   app.post('/api/whatsapp/simulate', requireAuth, (req: AuthedRequest, res) => {
     const session = req.session!;
     const { senderPhone, messageText, buttonId, lang } = req.body ?? {};
-    const preferredLang = lang === 'en' ? 'en' : 'fa';
+    const preferredLang = lang === 'fa' ? 'fa' : lang === 'nl' ? 'nl' : 'en';
 
     let effectivePhone = String(senderPhone ?? '').trim();
     let allowedCommunityIds: Set<string> | undefined;

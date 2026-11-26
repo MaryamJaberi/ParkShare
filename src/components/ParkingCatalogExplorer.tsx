@@ -397,7 +397,7 @@ export const ParkingCatalogExplorer: React.FC<Props> = ({
             <option value="ALL">{t(lang, 'همه انواع پارکینگ', 'All Types')}</option>
             {(Object.keys(CATEGORY_LABELS) as ParkingCategory[]).map((cat) => (
               <option key={cat} value={cat}>
-                {CATEGORY_LABELS[cat][lang]}
+                {t(lang, CATEGORY_LABELS[cat].fa, CATEGORY_LABELS[cat].en)}
               </option>
             ))}
           </select>
@@ -469,7 +469,7 @@ export const ParkingCatalogExplorer: React.FC<Props> = ({
                         <div className="flex flex-wrap items-center gap-x-2 text-xs text-slate-600 mt-0.5">
                           <span className="font-medium text-slate-800 inline-flex items-center gap-1">
                             {cat === 'ev' && <Zap className="w-3 h-3 text-emerald-700" />}
-                            {CATEGORY_LABELS[cat][lang]}
+                            {t(lang, CATEGORY_LABELS[cat].fa, CATEGORY_LABELS[cat].en)}
                           </span>
                           <span className="text-slate-300">·</span>
                           <span className="font-mono tabular-nums text-slate-500">
@@ -482,7 +482,7 @@ export const ParkingCatalogExplorer: React.FC<Props> = ({
                         </div>
                       </div>
                       <span className={`text-[11px] font-semibold shrink-0 ${statusMeta.cls}`}>
-                        {statusMeta[lang]}
+                        {t(lang, statusMeta.fa, statusMeta.en)}
                       </span>
                     </div>
 
@@ -556,7 +556,7 @@ export const ParkingCatalogExplorer: React.FC<Props> = ({
                         <td className="py-3 px-3.5 whitespace-nowrap">
                           <div className="font-medium text-slate-900 flex items-center gap-1">
                             {cat === 'ev' && <Zap className="w-3 h-3 text-emerald-700" />}
-                            <span>{CATEGORY_LABELS[cat][lang]}</span>
+                            <span>{t(lang, CATEGORY_LABELS[cat].fa, CATEGORY_LABELS[cat].en)}</span>
                           </div>
                           <div className="font-mono tabular-nums text-[11px] text-slate-500">
                             {r.dimensions.widthM}×{r.dimensions.lengthM}m
@@ -582,7 +582,7 @@ export const ParkingCatalogExplorer: React.FC<Props> = ({
                         <td className="py-3 px-3.5 whitespace-nowrap">
                           <span className={`font-medium inline-flex items-center gap-1 ${statusMeta.cls}`}>
                             {status === 'active' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                            {statusMeta[lang]}
+                            {t(lang, statusMeta.fa, statusMeta.en)}
                           </span>
                         </td>
                         <td
@@ -677,7 +677,11 @@ export const ParkingCatalogExplorer: React.FC<Props> = ({
                     <div className="flex justify-between gap-2">
                       <dt>{t(lang, 'نوع جایگاه', 'Category')}</dt>
                       <dd className="font-semibold text-slate-900">
-                        {CATEGORY_LABELS[inspectedResource.spaceMeta?.category ?? 'standard'][lang]}
+                        {t(
+                          lang,
+                          CATEGORY_LABELS[inspectedResource.spaceMeta?.category ?? 'standard'].fa,
+                          CATEGORY_LABELS[inspectedResource.spaceMeta?.category ?? 'standard'].en
+                        )}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-2">
@@ -717,7 +721,11 @@ export const ParkingCatalogExplorer: React.FC<Props> = ({
                     <div className="flex justify-between gap-2">
                       <dt>{t(lang, 'نوع مالکیت', 'Ownership')}</dt>
                       <dd className="font-medium text-slate-900">
-                        {OWNERSHIP_LABELS[inspectedResource.ownership?.ownershipType ?? 'private'][lang]}
+                        {t(
+                          lang,
+                          OWNERSHIP_LABELS[inspectedResource.ownership?.ownershipType ?? 'private'].fa,
+                          OWNERSHIP_LABELS[inspectedResource.ownership?.ownershipType ?? 'private'].en
+                        )}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-2">
@@ -749,7 +757,7 @@ export const ParkingCatalogExplorer: React.FC<Props> = ({
                       <dt>{t(lang, 'روش ورود', 'Entry')}</dt>
                       <dd className="text-slate-900 text-end">
                         {(inspectedResource.accessRules?.entryMethods ?? ['app', 'card'])
-                          .map((m) => ENTRY_LABELS[m][lang])
+                          .map((m) => t(lang, ENTRY_LABELS[m].fa, ENTRY_LABELS[m].en))
                           .join(' · ')}
                       </dd>
                     </div>

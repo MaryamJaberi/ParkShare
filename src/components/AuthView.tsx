@@ -1152,7 +1152,7 @@ export const AuthView: React.FC<Props> = ({
                               : (['residents_only'] as AccessPolicyLevel[])
                             ).map((pol) => (
                               <option key={pol} value={pol}>
-                                {POLICY_LABELS[pol][lang]}
+                                {t(lang, POLICY_LABELS[pol].fa, POLICY_LABELS[pol].en)}
                               </option>
                             ))}
                           </select>

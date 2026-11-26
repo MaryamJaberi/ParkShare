@@ -872,7 +872,7 @@ export const ResidentAppView: React.FC<Props> = ({
                     <option value="ALL">{t(lang, 'همه انواع پارکینگ', 'All Bay Types')}</option>
                     {(Object.keys(CATEGORY_LABELS) as ParkingCategory[]).map((cat) => (
                       <option key={cat} value={cat}>
-                        {CATEGORY_LABELS[cat][lang]}
+                        {t(lang, CATEGORY_LABELS[cat].fa, CATEGORY_LABELS[cat].en)}
                       </option>
                     ))}
                   </select>

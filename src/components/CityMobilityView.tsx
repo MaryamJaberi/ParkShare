@@ -98,7 +98,7 @@ export const CityMobilityView: React.FC<Props> = ({
                   categoryFilter === cat ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {CATEGORY_LABELS[cat][lang]}
+                {t(lang, CATEGORY_LABELS[cat].fa, CATEGORY_LABELS[cat].en)}
               </button>
             )
           )}

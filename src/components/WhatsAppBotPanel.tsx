@@ -66,7 +66,7 @@ export const WhatsAppBotPanel: React.FC<Props> = ({
 }) => {
   const [config, setConfig] = useState<WhatsAppConfigInfo | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [pinLang, setPinLang] = useState<'fa' | 'en'>(lang);
+  const [pinLang, setPinLang] = useState<'fa' | 'en'>(lang === 'fa' ? 'fa' : 'en');
   const [showTechSetup, setShowTechSetup] = useState(false);
 
   // Active whitelisted phones for this building (for manager simulator)

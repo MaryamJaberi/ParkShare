@@ -72,7 +72,7 @@ interface ServerStatePayload {
 }
 
 export default function App() {
-  const [lang, setLang] = useState<Language>('fa');
+  const [lang, setLang] = useState<Language>('nl');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Auth state kept strictly in JS memory (never localStorage/sessionStorage)
@@ -713,19 +713,31 @@ export default function App() {
                 onClick={() => setPreviewInviteToken(null)}
                 className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors whitespace-nowrap"
               >
-                <ArrowRight className={`w-3.5 h-3.5 ${lang === 'en' ? 'rotate-180' : ''}`} />
+                <ArrowRight className={`w-3.5 h-3.5 ${lang !== 'fa' ? 'rotate-180' : ''}`} />
                 {t(lang, 'بازگشت به پنل مدیر', 'Back to Manager')}
               </button>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setLang((prev) => (prev === 'fa' ? 'en' : 'fa'))}
-            className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap shrink-0"
+          <div
+            role="group"
+            aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
+            className="inline-flex items-center p-0.5 bg-slate-100 border border-slate-200 rounded-lg shrink-0"
           >
-            <Globe2 className="w-3.5 h-3.5" />
-            {lang === 'fa' ? 'English' : 'فارسی'}
-          </button>
+            {(['nl', 'en', 'fa'] as const).map((code) => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => setLang(code)}
+                className={`min-h-[34px] px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                  lang === code
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {code === 'nl' ? 'NL' : code === 'en' ? 'EN' : 'فارسی'}
+              </button>
+            ))}
+          </div>
         </header>
 
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-10">
@@ -904,7 +916,7 @@ export default function App() {
               >
                 <span className="flex items-center gap-3 min-w-0">
                   <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-slate-400'}`} />
-                  <span className="truncate">{lang === 'fa' ? item.labelFa : item.labelEn}</span>
+                  <span className="truncate">{t(lang, item.labelFa, item.labelEn)}</span>
                 </span>
                 {item.id === 'manager' && pendingExtendedCount > 0 && (
                   <span
@@ -1021,25 +1033,37 @@ export default function App() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setLang((prev) => (prev === 'fa' ? 'en' : 'fa'));
-                  setMobileNavOpen(false);
-                }}
-                className="min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium text-slate-800 bg-slate-100 rounded-xl hover:bg-slate-200"
+            <div className="space-y-2.5 pt-1">
+              <div
+                role="group"
+                aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
+                className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl"
               >
-                <Globe2 className="w-4 h-4" />
-                {lang === 'fa' ? 'تغییر زبان: English' : 'Language: فارسی'}
-              </button>
+                {(['nl', 'en', 'fa'] as const).map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => {
+                      setLang(code);
+                      setMobileNavOpen(false);
+                    }}
+                    className={`min-h-[40px] text-xs font-medium rounded-lg transition-colors ${
+                      lang === code
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {code === 'nl' ? 'Nederlands' : code === 'en' ? 'English' : 'فارسی'}
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
                 onClick={() => {
                   setMobileNavOpen(false);
                   handleLogout();
                 }}
-                className="min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100"
+                className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100"
               >
                 <LogOut className="w-4 h-4" />
                 {t(lang, 'خروج از حساب', 'Sign Out')}
@@ -1057,19 +1081,31 @@ export default function App() {
             <span className="font-bold text-slate-900 whitespace-nowrap lg:hidden">ParkShare</span>
             <span aria-hidden="true" className="lg:hidden text-slate-300">/</span>
             <span className="font-semibold text-slate-900 lg:text-base truncate">
-              {lang === 'fa' ? activeNavMeta.labelFa : activeNavMeta.labelEn}
+              {t(lang, activeNavMeta.labelFa, activeNavMeta.labelEn)}
             </span>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setLang((prev) => (prev === 'fa' ? 'en' : 'fa'))}
-              className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap"
+            <div
+              role="group"
+              aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
+              className="inline-flex items-center p-0.5 bg-slate-100 border border-slate-200 rounded-lg"
             >
-              <Globe2 className="w-3.5 h-3.5" />
-              {lang === 'fa' ? 'English' : 'فارسی'}
-            </button>
+              {(['nl', 'en', 'fa'] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLang(code)}
+                  className={`min-h-[34px] px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                    lang === code
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {code === 'nl' ? 'NL' : code === 'en' ? 'EN' : 'فارسی'}
+                </button>
+              ))}
+            </div>
 
             {/* Mobile Account / Sign-out Sheet Trigger */}
             <button
@@ -1239,7 +1275,7 @@ export default function App() {
                 >
                   <Icon className="w-[19px] h-[19px]" />
                   <span className="truncate max-w-full px-1">
-                    {lang === 'fa' ? item.shortFa : item.shortEn}
+                    {t(lang, item.shortFa, item.shortEn)}
                   </span>
                 </button>
               );

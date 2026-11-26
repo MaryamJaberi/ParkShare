@@ -584,7 +584,7 @@ export const NeighborInviteView: React.FC<Props> = ({
                 >
                   {managerAllowedPolicies.map((pol) => (
                     <option key={pol} value={pol}>
-                      {POLICY_LABELS[pol][lang]}
+                      {t(lang, POLICY_LABELS[pol].fa, POLICY_LABELS[pol].en)}
                     </option>
                   ))}
                 </select>
