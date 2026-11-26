@@ -697,7 +697,7 @@ export const HelpInfographicGuide: React.FC<Props> = ({
   const showBorrower = journeyFilter === 'all' || journeyFilter === 'borrower';
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="w-full min-w-0 max-w-full overflow-x-hidden space-y-8 pb-8">
       {/* Top Hero Banner */}
       <section className="relative overflow-hidden rounded-[28px] ps-hero-gradient text-white p-6 sm:p-8 shadow-[0_18px_42px_rgba(90,47,168,0.2)]">
         <div className="pointer-events-none absolute -top-16 -end-16 w-60 h-60 rounded-full bg-white/15 blur-2xl" />
@@ -772,7 +772,7 @@ export const HelpInfographicGuide: React.FC<Props> = ({
         <div
           role="tablist"
           aria-label={t(lang, 'فیلتر مسیر راهنما', 'Guide journey filter', 'Kies gebruikersroute')}
-          className="inline-flex flex-wrap items-center gap-1.5 p-1.5 bg-white border border-[#ECE9F7] rounded-2xl ps-card-shadow"
+          className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto max-w-full p-1.5 bg-white border border-[#ECE9F7] rounded-2xl ps-card-shadow"
         >
           {(
             [

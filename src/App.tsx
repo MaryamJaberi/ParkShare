@@ -834,9 +834,9 @@ export default function App() {
           </div>
         </header>
 
-        <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-10">
+        <main className="flex-1 w-full min-w-0 overflow-x-hidden flex items-center justify-center p-4 sm:p-6 lg:p-10">
           {showHelpGuide && !previewInviteToken ? (
-            <div className="w-full max-w-[1240px] mx-auto">
+            <div className="w-full min-w-0 max-w-[1240px] mx-auto">
               <HelpInfographicGuide
                 lang={lang}
                 onClose={() => setShowHelpGuide(false)}
