@@ -83,7 +83,7 @@ export interface BuildingWhatsAppGroupConfig {
   groupName: string;
   groupInviteUrl?: string;
   botPhoneNumber?: string;
-  defaultLanguage: 'fa' | 'en';
+  defaultLanguage: Language;
   pinnedConfirmed: boolean;
   connectedAt?: string;
 }

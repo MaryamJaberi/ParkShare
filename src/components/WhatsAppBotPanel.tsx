@@ -113,7 +113,7 @@ export const WhatsAppBotPanel: React.FC<Props> = ({
   const [groupName, setGroupName] = useState<string>('');
   const [groupInviteUrl, setGroupInviteUrl] = useState<string>('');
   const [botPhoneNumber, setBotPhoneNumber] = useState<string>('');
-  const [pinLang, setPinLang] = useState<'fa' | 'en'>(lang === 'fa' ? 'fa' : 'en');
+  const [pinLang, setPinLang] = useState<Language>(lang);
   const [savingGroup, setSavingGroup] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -135,7 +135,7 @@ export const WhatsAppBotPanel: React.FC<Props> = ({
     );
     setGroupInviteUrl(wg?.groupInviteUrl || '');
     setBotPhoneNumber(wg?.botPhoneNumber || config?.displayNumber || '');
-    setPinLang(wg?.defaultLanguage || (lang === 'fa' ? 'fa' : 'en'));
+    setPinLang(wg?.defaultLanguage || lang);
     setSaveFeedback(null);
   }, [community?.id, community?.whatsappGroup, config?.displayNumber, lang]);
 
@@ -215,7 +215,11 @@ export const WhatsAppBotPanel: React.FC<Props> = ({
 
   const waDirectBotLink = hasRealBotNumber
     ? `https://wa.me/${cleanBotDigits}?text=${encodeURIComponent(
-        pinLang === 'fa' ? 'سلام، درخواست پارکینگ دارم' : 'Hi, I need a parking spot'
+        pinLang === 'fa'
+          ? 'سلام، درخواست پارکینگ دارم'
+          : pinLang === 'nl'
+            ? 'Hallo, ik heb een parkeerplek nodig'
+            : 'Hi, I need a parking spot'
       )}`
     : '';
 
@@ -231,11 +235,18 @@ export const WhatsAppBotPanel: React.FC<Props> = ({
     const botLineEn = waDirectBotLink
       ? `Private 1-on-1 WhatsApp Bot:\n${waDirectBotLink}`
       : 'Private Bot Link: (auto-generated once your WhatsApp number is saved in Step 1)';
+    const botLineNl = waDirectBotLink
+      ? `Privé 1-op-1 WhatsApp-bot:\n${waDirectBotLink}`
+      : 'Privé bot-link: (wordt automatisch aangemaakt zodra het WhatsApp-nummer in stap 1 is opgeslagen)';
     const webLineFa = webInviteUrl ? `\n\nثبت‌نام سریع در پنل وب ساختمان:\n${webInviteUrl}` : '';
     const webLineEn = webInviteUrl ? `\n\nResident Web Portal Registration:\n${webInviteUrl}` : '';
+    const webLineNl = webInviteUrl ? `\n\nSnelle registratie in het bewonersportaal:\n${webInviteUrl}` : '';
 
     if (pinLang === 'fa') {
       return `سامانه خصوصی اشتراک پارکینگ «${buildingDisplayFa}»\n\nبرای رزرو موقت جای پارک یا اشتراک‌گذاری جایگاه خالی خودتان، پیام را داخل گروه نفرستید — روی لینک زیر بزنید تا به‌صورت خصوصی (۱ به ۱) با دستیار واتساپ ParkShare گفتگو کنید:\n${botLineFa}${webLineFa}\n\nچرا خصوصی؟\n• شماره، واحد و زمان نبودن شما در گروه نمایش داده نمی‌شود.\n• فقط ساکنان لیست رسمی ساختمان دسترسی دارند.\n• رزرو، تأیید و لغو همان‌جا در واتساپ انجام می‌شود و با پنل ساختمان همگام است.`;
+    }
+    if (pinLang === 'nl') {
+      return `Privé parkeerplaatsen delen — ${buildingDisplayEn}\n\nHeeft u tijdelijk een parkeerplek nodig of wilt u uw eigen plek delen wanneer u weg bent? Plaats uw afwezigheid niet in de gebouwgroep — tik hieronder om privé (1-op-1) te chatten met de ParkShare WhatsApp-bot:\n${botLineNl}${webLineNl}\n\nAVG / Privacy eerst:\n• Uw woningnummer, telefoon en afwezigheid worden nooit in de groep gedeeld.\n• Alleen geverifieerde nummers op de officiële bewonerslijst hebben toegang.\n• Direct reserveren, bevestigen en annuleren in WhatsApp, live gesynchroniseerd met het portaal.`;
     }
     return `Private Resident Parking Sharing — ${buildingDisplayEn}\n\nNeed a temporary bay or want to share yours while away? Please don't post your absence in the building group — tap below to message the private 1-on-1 ParkShare WhatsApp Bot:\n${botLineEn}${webLineEn}\n\nGDPR Privacy First:\n• Your unit, phone & away schedule are never shown in the group.\n• Only verified numbers on the building whitelist can access spots.\n• Instant booking, confirmation & cancellation right inside WhatsApp.`;
   }, [pinLang, buildingDisplayFa, buildingDisplayEn, waDirectBotLink, webInviteUrl]);
@@ -615,15 +626,15 @@ export const WhatsAppBotPanel: React.FC<Props> = ({
                       <span className="text-xs font-medium text-slate-600">
                         {t(lang, 'زبان پیام گروه:', 'Group message language:')}
                       </span>
-                      <div className="inline-grid grid-cols-2 gap-0.5 p-0.5 bg-slate-100 rounded-lg text-xs">
+                      <div className="inline-grid grid-cols-3 gap-0.5 p-0.5 bg-slate-100 rounded-lg text-xs">
                         <button
                           type="button"
-                          onClick={() => setPinLang('fa')}
+                          onClick={() => setPinLang('nl')}
                           className={`min-h-[32px] px-2.5 rounded-md font-semibold whitespace-nowrap ${
-                            pinLang === 'fa' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
+                            pinLang === 'nl' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
                           }`}
                         >
-                          فارسی
+                          NL
                         </button>
                         <button
                           type="button"
@@ -632,7 +643,16 @@ export const WhatsAppBotPanel: React.FC<Props> = ({
                             pinLang === 'en' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
                           }`}
                         >
-                          English (EU)
+                          EN
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPinLang('fa')}
+                          className={`min-h-[32px] px-2.5 rounded-md font-semibold whitespace-nowrap ${
+                            pinLang === 'fa' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
+                          }`}
+                        >
+                          فارسی
                         </button>
                       </div>
                     </div>

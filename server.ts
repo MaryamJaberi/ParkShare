@@ -1340,7 +1340,8 @@ async function startServer() {
       groupName,
       groupInviteUrl: safeInviteUrl,
       botPhoneNumber: safeBotPhone,
-      defaultLanguage: body.defaultLanguage === 'en' ? 'en' : 'fa',
+      defaultLanguage:
+        body.defaultLanguage === 'en' ? 'en' : body.defaultLanguage === 'nl' ? 'nl' : 'fa',
       pinnedConfirmed: Boolean(body.pinnedConfirmed),
       connectedAt: comm.whatsappGroup?.connectedAt || new Date().toISOString(),
     };
