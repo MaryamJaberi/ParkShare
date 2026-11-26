@@ -5,7 +5,7 @@ import {
   Building2,
   CalendarClock,
   Car,
-  Globe2,
+  HelpCircle,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -45,6 +45,12 @@ import { AvailabilityBookingsView } from './components/AvailabilityBookingsView'
 import { FederationPrivacyView } from './components/FederationPrivacyView';
 import { AdminSection, SuperAdminView } from './components/SuperAdminView';
 import { WhatsAppBotPanel } from './components/WhatsAppBotPanel';
+import { HelpInfographicGuide } from './components/HelpInfographicGuide';
+import {
+  GuidedTourOverlay,
+  PARKSHARE_TOUR_STORAGE_KEY,
+  TourTargetTab,
+} from './components/GuidedTourOverlay';
 import { WhatsAppBotReply } from './engines/whatsappBotEngine';
 
 type ActiveTab =
@@ -75,6 +81,34 @@ interface ServerStatePayload {
 export default function App() {
   const [lang, setLang] = useState<Language>('nl');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [showHelpGuide, setShowHelpGuide] = useState(false);
+  const [tourDismissed, setTourDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem(PARKSHARE_TOUR_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissTourForever = useCallback(() => {
+    setTourDismissed(true);
+    try {
+      window.localStorage.setItem(PARKSHARE_TOUR_STORAGE_KEY, 'true');
+    } catch {
+      // Ignore storage errors in restricted iframes
+    }
+  }, []);
+
+  const handleRestartTour = useCallback(() => {
+    setShowHelpGuide(false);
+    setTourDismissed(false);
+    try {
+      window.localStorage.removeItem(PARKSHARE_TOUR_STORAGE_KEY);
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
 
   // Auth state kept strictly in JS memory (never localStorage/sessionStorage)
   const [authReady, setAuthReady] = useState(false);
@@ -717,12 +751,12 @@ export default function App() {
   // Loading bootstrap state
   if (!authReady) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 p-6">
-        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-[#F6F5FB] flex flex-col items-center justify-center gap-3 p-6">
+        <div className="w-11 h-11 rounded-2xl ps-hero-gradient text-white flex items-center justify-center shadow-sm">
           <Building2 className="w-5 h-5" />
         </div>
-        <div className="text-sm font-medium text-slate-600">
-          {t(lang, 'در حال آماده‌سازی ParkShare...', 'Preparing ParkShare...')}
+        <div className="text-sm font-medium text-[#5A5770]">
+          {t(lang, 'در حال آماده‌سازی ParkShare...', 'Preparing ParkShare...', 'ParkShare voorbereiden...')}
         </div>
       </div>
     );
@@ -731,57 +765,97 @@ export default function App() {
   // Unauthenticated OR Manager previewing the neighbor invite link
   if (!authToken || !authAccount || previewInviteToken) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
-        <header className="h-14 sm:h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-20">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
+      <div className="min-h-screen bg-[#F6F5FB] text-[#171525] flex flex-col">
+        <header className="h-14 sm:h-16 bg-white/90 backdrop-blur-md border-b border-[#ECE9F7] px-4 sm:px-8 flex items-center justify-between gap-3 sticky top-0 z-20">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl ps-hero-gradient text-white flex items-center justify-center shrink-0">
+              <Car className="w-4 h-4" />
+            </div>
+            <span className="text-lg font-bold tracking-tight text-[#171525] whitespace-nowrap shrink-0">
               ParkShare
             </span>
             {previewInviteToken && authAccount?.role === 'manager' && (
               <button
                 type="button"
                 onClick={() => setPreviewInviteToken(null)}
-                className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 text-xs font-semibold text-[#5A2FA8] bg-[#EFEAFC] rounded-xl hover:bg-[#E4DCFB] transition-colors whitespace-nowrap"
               >
                 <ArrowRight className={`w-3.5 h-3.5 ${lang !== 'fa' ? 'rotate-180' : ''}`} />
-                {t(lang, 'بازگشت به پنل مدیر', 'Back to Manager')}
+                {t(lang, 'بازگشت به پنل مدیر', 'Back to Manager', 'Terug naar beheer')}
               </button>
             )}
           </div>
-          <div
-            role="group"
-            aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
-            className="inline-flex items-center p-0.5 bg-slate-100 border border-slate-200 rounded-lg shrink-0"
-          >
-            {(['nl', 'en', 'fa'] as const).map((code) => (
+          <div className="flex items-center gap-2 shrink-0">
+            {!previewInviteToken && (
               <button
-                key={code}
                 type="button"
-                onClick={() => setLang(code)}
-                className={`min-h-[34px] px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-                  lang === code
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                onClick={() => setShowHelpGuide((prev) => !prev)}
+                aria-label={t(
+                  lang,
+                  'راهنمای کامل و اینفوگرافیک',
+                  'Complete Help Guide & Infographic',
+                  'Complete handleiding & infographic'
+                )}
+                title={t(lang, 'راهنمای کامل', 'Help Guide', 'Handleiding')}
+                className={`inline-flex items-center justify-center gap-1.5 min-w-[38px] min-h-[38px] px-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  showHelpGuide
+                    ? 'ps-violet-btn text-white'
+                    : 'bg-[#F3EFFC] text-[#5A2FA8] hover:bg-[#E7DFFA]'
                 }`}
               >
-                {code === 'nl' ? 'NL' : code === 'en' ? 'EN' : 'فارسی'}
+                <HelpCircle className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">
+                  {showHelpGuide
+                    ? t(lang, 'بازگشت به ورود', 'Back to Sign In', 'Terug')
+                    : t(lang, 'راهنما', 'Help', 'Hulp')}
+                </span>
               </button>
-            ))}
+            )}
+            <div
+              role="group"
+              aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
+              className="inline-flex items-center p-0.5 bg-[#F2EFFA] border border-[#E4DEF4] rounded-xl shrink-0"
+            >
+              {(['nl', 'en', 'fa'] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLang(code)}
+                  className={`min-h-[34px] px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+                    lang === code
+                      ? 'bg-white text-[#5A2FA8] shadow-xs'
+                      : 'text-[#6B6780] hover:text-[#171525]'
+                  }`}
+                >
+                  {code === 'nl' ? 'NL' : code === 'en' ? 'EN' : 'فارسی'}
+                </button>
+              ))}
+            </div>
           </div>
         </header>
 
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-10">
-          <AuthView
-            lang={lang}
-            hasManager={hasManager}
-            hasSuperAdmin={hasSuperAdmin}
-            envAdminConfigured={envAdminConfigured}
-            isAdminRoute={isAdminRoute}
-            initialInviteToken={previewInviteToken ?? inviteToken}
-            onAuthenticated={handleAuthenticated}
-            onClearInviteToken={clearUrlInviteParam}
-            onExitAdminRoute={handleExitAdminRoute}
-          />
+          {showHelpGuide && !previewInviteToken ? (
+            <div className="w-full max-w-[1240px] mx-auto">
+              <HelpInfographicGuide
+                lang={lang}
+                onClose={() => setShowHelpGuide(false)}
+                showTourButton={false}
+              />
+            </div>
+          ) : (
+            <AuthView
+              lang={lang}
+              hasManager={hasManager}
+              hasSuperAdmin={hasSuperAdmin}
+              envAdminConfigured={envAdminConfigured}
+              isAdminRoute={isAdminRoute}
+              initialInviteToken={previewInviteToken ?? inviteToken}
+              onAuthenticated={handleAuthenticated}
+              onClearInviteToken={clearUrlInviteParam}
+              onExitAdminRoute={handleExitAdminRoute}
+            />
+          )}
         </main>
       </div>
     );
@@ -917,19 +991,24 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex">
+    <div className="min-h-screen bg-[#F6F5FB] text-[#171525] flex">
       {/* Desktop Sidebar (260px) */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-e border-slate-200 z-30">
-        <div className="h-16 px-6 flex items-center justify-between border-b border-slate-200">
-          <span className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap">
-            ParkShare
-          </span>
-          <span className="text-xs font-semibold text-blue-700">
+      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-e border-[#ECE9F7] z-30">
+        <div className="h-16 px-5 flex items-center justify-between border-b border-[#ECE9F7]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl ps-hero-gradient text-white flex items-center justify-center shrink-0">
+              <Car className="w-4 h-4" />
+            </div>
+            <span className="text-lg font-bold tracking-tight text-[#171525] whitespace-nowrap">
+              ParkShare
+            </span>
+          </div>
+          <span className="text-xs font-semibold text-[#6E41C4]">
             {roleLabel}
           </span>
         </div>
 
-        <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto" aria-label="Main navigation">
+        <nav className="flex-1 px-3 py-5 space-y-1.5 overflow-y-auto" aria-label="Main navigation">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = activeTab === item.id;
@@ -937,21 +1016,24 @@ export default function App() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full min-h-[42px] flex items-center justify-between gap-2 px-3.5 py-2.5 text-sm font-medium rounded-xl transition-colors whitespace-nowrap ${
-                  active
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                onClick={() => {
+                  setShowHelpGuide(false);
+                  setActiveTab(item.id);
+                }}
+                className={`w-full min-h-[44px] flex items-center justify-between gap-2 px-3.5 py-2.5 text-sm font-semibold rounded-2xl transition-all whitespace-nowrap ${
+                  active && !showHelpGuide
+                    ? 'ps-violet-btn text-white'
+                    : 'text-[#5C5873] hover:bg-[#F5F1FD] hover:text-[#5A2FA8]'
                 }`}
               >
                 <span className="flex items-center gap-3 min-w-0">
-                  <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 shrink-0 ${active && !showHelpGuide ? 'text-white' : 'text-[#8C87A3]'}`} />
                   <span className="truncate">{t(lang, item.labelFa, item.labelEn)}</span>
                 </span>
                 {item.id === 'manager' && pendingExtendedCount > 0 && (
                   <span
-                    className={`text-[11px] font-mono tabular-nums font-semibold ${
-                      active ? 'text-amber-300' : 'text-amber-700'
+                    className={`text-[11px] font-mono tabular-nums font-bold px-1.5 py-0.5 rounded-md ${
+                      active ? 'bg-white/20 text-white' : 'bg-[#FFF0EB] text-[#E05330]'
                     }`}
                   >
                     {pendingExtendedCount}
@@ -962,14 +1044,14 @@ export default function App() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-200 space-y-3.5 text-xs">
+        <div className="p-4 border-t border-[#ECE9F7] space-y-3.5 text-xs">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-[#EFEAFC] text-[#5A2FA8] flex items-center justify-center shrink-0">
               <UserCheck className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <div className="font-semibold text-slate-900 truncate">{authAccount.displayName}</div>
-              <div className="text-[11px] text-slate-500 font-mono truncate">@{authAccount.username}</div>
+              <div className="font-semibold text-[#171525] truncate">{authAccount.displayName}</div>
+              <div className="text-[11px] text-[#7D7A92] font-mono truncate">@{authAccount.username}</div>
             </div>
           </div>
 
@@ -1022,7 +1104,7 @@ export default function App() {
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full min-h-[40px] inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+            className="w-full min-h-[40px] inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-[#5C5873] bg-[#F5F2FB] hover:bg-[#EAE4F8] hover:text-[#171525] rounded-xl transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
             {t(lang, 'خروج از حساب', 'Sign Out')}
@@ -1106,30 +1188,56 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex-1 lg:ps-64 flex flex-col min-w-0 pb-20 lg:pb-0">
         {/* Compact Top Bar (52px mobile, 64px desktop — single language switch on desktop, no duplicate Sign Out) */}
-        <header className="h-[52px] lg:h-16 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-20">
-          <div className="flex items-center gap-2 text-sm text-slate-500 min-w-0">
-            <span className="font-bold text-slate-900 whitespace-nowrap lg:hidden">ParkShare</span>
-            <span aria-hidden="true" className="lg:hidden text-slate-300">/</span>
-            <span className="font-semibold text-slate-900 lg:text-base truncate">
-              {t(lang, activeNavMeta.labelFa, activeNavMeta.labelEn)}
+        <header className="h-[52px] lg:h-16 bg-white/90 backdrop-blur-md border-b border-[#ECE9F7] px-4 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-20">
+          <div className="flex items-center gap-2 text-sm text-[#7D7A92] min-w-0">
+            <span className="font-bold text-[#171525] whitespace-nowrap lg:hidden">ParkShare</span>
+            <span aria-hidden="true" className="lg:hidden text-[#D6D0EC]">/</span>
+            <span className="font-semibold text-[#171525] lg:text-base truncate">
+              {showHelpGuide
+                ? t(lang, 'راهنمای کامل و اینفوگرافیک', 'Help Guide & Infographic', 'Handleiding & Infographic')
+                : t(lang, activeNavMeta.labelFa, activeNavMeta.labelEn)}
             </span>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowHelpGuide((prev) => !prev)}
+              aria-label={t(
+                lang,
+                'راهنمای کامل و اینفوگرافیک',
+                'Complete Help Guide & Infographic',
+                'Complete handleiding & infographic'
+              )}
+              title={t(lang, 'راهنمای کامل', 'Help Guide', 'Handleiding')}
+              className={`min-w-[38px] min-h-[38px] px-2.5 rounded-xl inline-flex items-center justify-center gap-1.5 text-xs font-bold transition-all whitespace-nowrap ${
+                showHelpGuide
+                  ? 'ps-violet-btn text-white'
+                  : 'bg-[#F3EFFC] text-[#5A2FA8] hover:bg-[#E7DFFA]'
+              }`}
+            >
+              <HelpCircle className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">
+                {showHelpGuide
+                  ? t(lang, 'بستن راهنما', 'Close Help', 'Sluit hulp')
+                  : t(lang, 'راهنما', 'Help', 'Hulp')}
+              </span>
+            </button>
+
             <div
               role="group"
               aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
-              className="inline-flex items-center p-0.5 bg-slate-100 border border-slate-200 rounded-lg"
+              className="inline-flex items-center p-0.5 bg-[#F2EFFA] border border-[#E4DEF4] rounded-xl"
             >
               {(['nl', 'en', 'fa'] as const).map((code) => (
                 <button
                   key={code}
                   type="button"
                   onClick={() => setLang(code)}
-                  className={`min-h-[34px] px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                  className={`min-h-[34px] px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
                     lang === code
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-white text-[#5A2FA8] shadow-xs'
+                      : 'text-[#6B6780] hover:text-[#171525]'
                   }`}
                 >
                   {code === 'nl' ? 'NL' : code === 'en' ? 'EN' : 'فارسی'}
@@ -1141,7 +1249,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="lg:hidden min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              className="lg:hidden min-w-[40px] min-h-[40px] flex items-center justify-center text-[#5A2FA8] bg-[#F3EFFC] hover:bg-[#E7DFFA] rounded-xl transition-colors"
               aria-label={t(lang, 'حساب کاربری و خروج', 'Account and sign out')}
             >
               <Menu className="w-4 h-4" />
@@ -1150,16 +1258,23 @@ export default function App() {
         </header>
 
         <main className="flex-1 px-4 pt-6 pb-4 sm:p-6 lg:p-8 max-w-[1280px] w-full mx-auto scroll-mt-20">
-          {loadingState && !isSuperAdmin ? (
+          {showHelpGuide ? (
+            <HelpInfographicGuide
+              lang={lang}
+              onClose={() => setShowHelpGuide(false)}
+              onStartTour={!isSuperAdmin ? handleRestartTour : undefined}
+              showTourButton={!isSuperAdmin}
+            />
+          ) : loadingState && !isSuperAdmin ? (
             <div className="space-y-4 py-4 animate-pulse">
-              <div className="h-8 w-56 bg-slate-200 rounded-lg" />
+              <div className="h-8 w-56 bg-[#E8E2F7] rounded-xl" />
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="h-24 bg-white border border-slate-200 rounded-2xl" />
-                <div className="h-24 bg-white border border-slate-200 rounded-2xl" />
-                <div className="h-24 bg-white border border-slate-200 rounded-2xl" />
-                <div className="h-24 bg-white border border-slate-200 rounded-2xl" />
+                <div className="h-24 bg-white border border-[#ECE9F7] rounded-2xl" />
+                <div className="h-24 bg-white border border-[#ECE9F7] rounded-2xl" />
+                <div className="h-24 bg-white border border-[#ECE9F7] rounded-2xl" />
+                <div className="h-24 bg-white border border-[#ECE9F7] rounded-2xl" />
               </div>
-              <div className="h-64 bg-white border border-slate-200 rounded-2xl" />
+              <div className="h-64 bg-white border border-[#ECE9F7] rounded-2xl" />
             </div>
           ) : (
             <>
@@ -1283,10 +1398,25 @@ export default function App() {
           )}
         </main>
 
-        {/* Mobile Bottom Tab Bar (Compact 58px frosted bar — total mobile sticky height <= 110px) */}
+        {/* Dismissible Guided Tour Across Real App Sections (Permanently hidden once exited) */}
+        {!isSuperAdmin && !tourDismissed && !showHelpGuide && (
+          <GuidedTourOverlay
+            lang={lang}
+            role={isManager ? 'manager' : 'resident'}
+            activeTab={activeTab}
+            onNavigateTab={(tab: TourTargetTab) => {
+              setShowHelpGuide(false);
+              setActiveTab(tab);
+            }}
+            onDismissForever={handleDismissTourForever}
+            onOpenFullGuide={() => setShowHelpGuide(true)}
+          />
+        )}
+
+        {/* Mobile Bottom Tab Bar */}
         <nav
           aria-label="Mobile navigation"
-          className="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-1.5 py-1 pb-safe z-30"
+          className="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-[#ECE9F7] rounded-t-3xl shadow-[0_-8px_28px_rgba(32,20,76,0.06)] px-2 py-1.5 pb-safe z-30"
         >
           <div
             className="grid items-center gap-1"
@@ -1294,14 +1424,17 @@ export default function App() {
           >
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = activeTab === item.id;
+              const active = activeTab === item.id && !showHelpGuide;
               return (
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveTab(item.id)}
-                  className={`relative min-h-[48px] flex flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-medium transition-colors ${
-                    active ? 'text-blue-700 bg-blue-50/70' : 'text-slate-500 active:bg-slate-100'
+                  onClick={() => {
+                    setShowHelpGuide(false);
+                    setActiveTab(item.id);
+                  }}
+                  className={`relative min-h-[48px] flex flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-semibold transition-colors ${
+                    active ? 'text-[#6E41C4] bg-[#F4EFFD]' : 'text-[#8C87A3] active:bg-[#F5F2FB]'
                   }`}
                 >
                   <Icon className="w-[19px] h-[19px]" />

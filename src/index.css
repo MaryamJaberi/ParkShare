@@ -5,11 +5,30 @@
     --font-fa: "Vazirmatn", "Plus Jakarta Sans", system-ui, sans-serif;
     --font-en: "Plus Jakarta Sans", "Vazirmatn", system-ui, sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+    /* ParkShare UI Kit — Lavender Violet & Sunset Coral Palette */
+    --ps-canvas: #f6f5fb;
+    --ps-surface: #ffffff;
+    --ps-surface-tint: #faf9fe;
+    --ps-border: #ece9f7;
+    --ps-violet-50: #f4effd;
+    --ps-violet-100: #e9dffb;
+    --ps-violet-500: #8a56e2;
+    --ps-violet-600: #6e41c4;
+    --ps-violet-700: #5a2fa8;
+    --ps-orchid: #d58af0;
+    --ps-coral: #f46a46;
+    --ps-coral-hover: #e35733;
+    --ps-coral-soft: #fff0ec;
   }
 
   html {
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--ps-canvas);
   }
 
   html[dir="rtl"] body {
@@ -26,15 +45,46 @@
     font-family: var(--font-mono);
   }
 
-  /* Accessible keyboard focus rings everywhere */
+  /* Accessible keyboard focus rings matching brand violet */
   button:focus-visible,
   a:focus-visible,
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid #2563eb;
+    outline: 2px solid #7546cc;
     outline-offset: 2px;
   }
+}
+
+/* ParkShare UI Kit Signature Surfaces & Gradients */
+.ps-hero-gradient {
+  background: linear-gradient(135deg, #d78ef2 0%, #9f6ee8 52%, #7342c4 100%);
+}
+
+.ps-violet-btn {
+  background: linear-gradient(135deg, #8654dd 0%, #6638b6 100%);
+  box-shadow: 0 10px 24px -10px rgba(104, 59, 184, 0.55);
+}
+
+.ps-violet-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7946d3 0%, #592ea5 100%);
+}
+
+.ps-coral-btn {
+  background: linear-gradient(135deg, #f87856 0%, #ef5e38 100%);
+  box-shadow: 0 10px 22px -8px rgba(244, 106, 70, 0.52);
+}
+
+.ps-coral-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f26844 0%, #df4f2a 100%);
+}
+
+.ps-card-shadow {
+  box-shadow: 0 12px 32px -16px rgba(93, 62, 158, 0.14);
+}
+
+.ps-coral-glow {
+  box-shadow: 0 10px 22px -6px rgba(244, 106, 70, 0.48);
 }
 
 .tabular-nums {
@@ -68,11 +118,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d5cff0;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #b1a5e0;
 }
 
 @media (prefers-reduced-motion: reduce) {

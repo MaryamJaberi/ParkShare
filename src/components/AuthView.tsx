@@ -325,12 +325,15 @@ export const AuthView: React.FC<Props> = ({
 
   return (
     <div className="w-full max-w-5xl mx-auto">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-0 items-stretch bg-transparent lg:bg-white lg:border lg:border-slate-200 lg:rounded-3xl lg:overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-0 items-stretch bg-transparent lg:bg-white lg:border lg:border-[#ECE9F7] lg:rounded-3xl lg:overflow-hidden lg:ps-card-shadow">
         {/* Desktop Value & Privacy Pillar Panel (Hidden on mobile so form is instantly above the fold) */}
-        <aside className="hidden lg:flex lg:col-span-5 bg-slate-900 text-white p-10 flex-col justify-between">
-          <div className="space-y-8">
+        <aside className="hidden lg:flex lg:col-span-5 bg-gradient-to-br from-[#2B1B54] via-[#4C2A96] to-[#7342C4] text-white p-10 flex-col justify-between relative overflow-hidden">
+          <div className="pointer-events-none absolute -top-16 -end-16 w-56 h-56 rounded-full bg-[#D58AF0]/25 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-16 -start-10 w-44 h-44 rounded-full bg-[#F46A46]/20 blur-2xl" />
+
+          <div className="space-y-8 relative">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/20 text-white flex items-center justify-center shrink-0">
                 <Building2 className="w-5 h-5" />
               </div>
               <span className="text-xl font-bold tracking-tight">ParkShare</span>
@@ -344,7 +347,7 @@ export const AuthView: React.FC<Props> = ({
                   'Private, fair parking sharing built for your building'
                 )}
               </h1>
-              <p className="text-sm text-slate-300 leading-relaxed">
+              <p className="text-sm text-[#EAE4FB] leading-relaxed">
                 {t(
                   lang,
                   'جای پارک‌های خالی را فقط در اختیار همسایه‌های تاییدشده بگذارید؛ با کنترل کامل مدیر ساختمان و حفظ حریم خصوصی هر واحد.',
@@ -353,14 +356,14 @@ export const AuthView: React.FC<Props> = ({
               </p>
             </div>
 
-            <div className="space-y-5 pt-4 border-t border-slate-800">
+            <div className="space-y-5 pt-4 border-t border-white/15">
               <div className="flex items-start gap-3.5">
-                <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <ShieldCheck className="w-5 h-5 text-[#9EEAD8] shrink-0 mt-0.5" />
                 <div>
                   <div className="text-sm font-semibold text-white">
                     {t(lang, 'ورود فقط با لیست رسمی مدیر', 'Manager Whitelist Only')}
                   </div>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  <p className="text-xs text-[#D9CEF7] mt-1 leading-relaxed">
                     {t(
                       lang,
                       'هیچ فرد خارج از لیست مجاز ساختمان نمی‌تواند ثبت‌نام کند یا ظرفیت پارکینگ‌ها را ببیند.',
@@ -371,12 +374,12 @@ export const AuthView: React.FC<Props> = ({
               </div>
 
               <div className="flex items-start gap-3.5">
-                <Lock className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                <Lock className="w-5 h-5 text-[#E5B8FA] shrink-0 mt-0.5" />
                 <div>
                   <div className="text-sm font-semibold text-white">
                     {t(lang, 'هویت مخفی در تمام رزروها', 'Pseudonymous by Default')}
                   </div>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  <p className="text-xs text-[#D9CEF7] mt-1 leading-relaxed">
                     {t(
                       lang,
                       'نام، شماره واحد، تلفن و ایمیل شما هرگز برای همسایه‌های دیگر نمایش داده نمی‌شود.',
@@ -387,12 +390,12 @@ export const AuthView: React.FC<Props> = ({
               </div>
 
               <div className="flex items-start gap-3.5">
-                <Scale className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <Scale className="w-5 h-5 text-[#FFB49F] shrink-0 mt-0.5" />
                 <div>
                   <div className="text-sm font-semibold text-white">
                     {t(lang, 'قوانین منصفانه پارکینگ موقت', 'Anti-Abuse Fair-Use Rules')}
                   </div>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  <p className="text-xs text-[#D9CEF7] mt-1 leading-relaxed">
                     {t(
                       lang,
                       'سقف ساعتی، روزانه و ماهانه از تبدیل پارکینگ موقت به اجاره دائمی جلوگیری می‌کند.',
@@ -404,7 +407,7 @@ export const AuthView: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-800 text-xs text-slate-400">
+          <div className="pt-6 border-t border-white/15 text-xs text-[#D9CEF7] relative">
             {t(
               lang,
               'داده‌های هر ساختمان به‌صورت جداگانه و رمزگذاری‌شده نگهداری می‌شود.',
@@ -418,11 +421,11 @@ export const AuthView: React.FC<Props> = ({
           <div className="w-full max-w-md mx-auto space-y-5">
             {/* Compact Mobile Brand Header */}
             <div className="lg:hidden text-center space-y-1.5">
-              <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-slate-900 text-white mx-auto">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl ps-hero-gradient text-white mx-auto shadow-sm">
                 <Building2 className="w-5 h-5" />
               </div>
-              <h1 className="text-xl font-bold text-slate-900">ParkShare</h1>
-              <p className="text-xs text-slate-500">
+              <h1 className="text-xl font-bold text-[#171525]">ParkShare</h1>
+              <p className="text-xs text-[#7D7A92]">
                 {t(lang, 'اشتراک‌گذاری امن و خصوصی پارکینگ ساختمان', 'Private & Secure Building Parking Sharing')}
               </p>
             </div>
@@ -561,14 +564,14 @@ export const AuthView: React.FC<Props> = ({
                 <button
                   type="submit"
                   disabled={loading || passwordsMismatch}
-                  className="w-full h-12 text-sm font-semibold bg-blue-700 text-white rounded-xl hover:bg-blue-800 active:scale-[0.99] transition-all disabled:opacity-50"
+                  className="w-full h-12 text-sm font-semibold ps-violet-btn text-white rounded-2xl active:scale-[0.99] transition-all disabled:opacity-50"
                 >
                   {loading
                     ? t(lang, 'در حال ساخت حساب...', 'Creating account...')
                     : t(lang, 'ساخت حساب مدیر و ورود', 'Create Manager Account')}
                 </button>
 
-                <div className="pt-3 border-t border-slate-100 text-center">
+                <div className="pt-3 border-t border-[#ECE9F7] text-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -576,7 +579,7 @@ export const AuthView: React.FC<Props> = ({
                       setLoginRole('manager');
                       setMode('login');
                     }}
-                    className="min-h-[40px] px-3 text-xs font-medium text-blue-700 hover:underline"
+                    className="min-h-[40px] px-3 text-xs font-semibold text-[#6E41C4] hover:underline"
                   >
                     {t(
                       lang,
@@ -819,15 +822,15 @@ export const AuthView: React.FC<Props> = ({
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl">
+                <div className="grid grid-cols-2 gap-1 p-1 bg-[#F2EFFA] rounded-2xl">
                   <button
                     type="button"
                     onClick={() => {
                       setLoginRole('resident');
                       setError(null);
                     }}
-                    className={`min-h-[40px] text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
-                      loginRole === 'resident' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    className={`min-h-[40px] text-xs font-semibold rounded-xl transition-colors whitespace-nowrap ${
+                      loginRole === 'resident' ? 'bg-white text-[#5A2FA8] shadow-xs' : 'text-[#6B6780] hover:text-[#171525]'
                     }`}
                   >
                     {t(lang, 'ورود ساکن', 'Resident Login')}
@@ -838,8 +841,8 @@ export const AuthView: React.FC<Props> = ({
                       setLoginRole('manager');
                       setError(null);
                     }}
-                    className={`min-h-[40px] text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
-                      loginRole === 'manager' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    className={`min-h-[40px] text-xs font-semibold rounded-xl transition-colors whitespace-nowrap ${
+                      loginRole === 'manager' ? 'bg-white text-[#5A2FA8] shadow-xs' : 'text-[#6B6780] hover:text-[#171525]'
                     }`}
                   >
                     {t(lang, 'ورود مدیر ساختمان', 'Manager Login')}
@@ -893,7 +896,7 @@ export const AuthView: React.FC<Props> = ({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-12 text-sm font-semibold bg-blue-700 text-white rounded-xl hover:bg-blue-800 active:scale-[0.99] transition-all disabled:opacity-50"
+                  className="w-full h-12 text-sm font-semibold ps-violet-btn text-white rounded-2xl active:scale-[0.99] transition-all disabled:opacity-50"
                 >
                   {loading
                     ? t(lang, 'در حال ورود...', 'Signing in...')
@@ -902,7 +905,7 @@ export const AuthView: React.FC<Props> = ({
                       : t(lang, 'ورود به اپلیکیشن ساکنان', 'Sign In as Resident')}
                 </button>
 
-                <div className="pt-3 border-t border-slate-100 text-center">
+                <div className="pt-3 border-t border-[#ECE9F7] text-center">
                   {loginRole === 'resident' ? (
                     <button
                       type="button"
@@ -911,7 +914,7 @@ export const AuthView: React.FC<Props> = ({
                         setVerifiedData(null);
                         setMode('resident_register');
                       }}
-                      className="min-h-[40px] px-3 text-xs font-medium text-blue-700 hover:underline"
+                      className="min-h-[40px] px-3 text-xs font-semibold text-[#6E41C4] hover:underline"
                     >
                       {t(
                         lang,
@@ -926,7 +929,7 @@ export const AuthView: React.FC<Props> = ({
                         setError(null);
                         setMode('setup_manager');
                       }}
-                      className="min-h-[40px] px-3 text-xs font-medium text-blue-700 hover:underline"
+                      className="min-h-[40px] px-3 text-xs font-semibold text-[#6E41C4] hover:underline"
                     >
                       {t(
                         lang,
@@ -978,8 +981,8 @@ export const AuthView: React.FC<Props> = ({
 
                 {/* Progress Bar */}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="h-1.5 rounded-full bg-blue-700" />
-                  <div className={`h-1.5 rounded-full transition-colors ${verifiedData ? 'bg-blue-700' : 'bg-slate-200'}`} />
+                  <div className="h-1.5 rounded-full bg-[#6E41C4]" />
+                  <div className={`h-1.5 rounded-full transition-colors ${verifiedData ? 'bg-[#6E41C4]' : 'bg-[#E5DFF5]'}`} />
                 </div>
 
                 {inviteInfo?.communities?.length ? (
@@ -1033,7 +1036,7 @@ export const AuthView: React.FC<Props> = ({
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full h-12 inline-flex items-center justify-center gap-2 text-sm font-semibold bg-blue-700 text-white rounded-xl hover:bg-blue-800 active:scale-[0.99] transition-all disabled:opacity-50"
+                      className="w-full h-12 inline-flex items-center justify-center gap-2 text-sm font-semibold ps-violet-btn text-white rounded-2xl active:scale-[0.99] transition-all disabled:opacity-50"
                     >
                       <KeyRound className="w-4 h-4" />
                       {loading ? t(lang, 'در حال بررسی...', 'Checking...') : t(lang, 'بررسی لیست و ادامه', 'Verify & Continue')}
@@ -1214,7 +1217,7 @@ export const AuthView: React.FC<Props> = ({
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full h-12 inline-flex items-center justify-center gap-2 text-sm font-semibold bg-blue-700 text-white rounded-xl hover:bg-blue-800 active:scale-[0.99] transition-all disabled:opacity-50"
+                      className="w-full h-12 inline-flex items-center justify-center gap-2 text-sm font-semibold ps-violet-btn text-white rounded-2xl active:scale-[0.99] transition-all disabled:opacity-50"
                     >
                       <ShieldCheck className="w-4 h-4" />
                       {loading

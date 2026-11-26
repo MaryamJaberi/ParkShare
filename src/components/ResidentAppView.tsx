@@ -3,10 +3,12 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
   Download,
+  LayoutGrid,
+  List,
   Lock,
   MessageSquarePlus,
+  Navigation,
   RotateCcw,
   Send,
   ShieldCheck,
@@ -33,6 +35,15 @@ import { runSmartMatchingPipeline } from '../engines/coreEngine';
 import { formatDuration, formatMinutes, reservationStatusLabels, t } from '../i18n/translations';
 import { downloadJsonFile, pseudonymizeUser } from '../utils/privacy';
 import { CATEGORY_LABELS } from './ParkingCatalogExplorer';
+import {
+  FloorMapSlot,
+  PSBayListCard,
+  PSButton,
+  PSFloorBayMap,
+  PSHeroBanner,
+  PSRouteGuidanceCard,
+  PSVehicleCategoryTiles,
+} from './ui/ParkShareUIKit';
 
 interface Props {
   lang: Language;
@@ -126,6 +137,14 @@ export const ResidentAppView: React.FC<Props> = ({
   const [draftComment, setDraftComment] = useState<string>('');
   const [draftAnonymous, setDraftAnonymous] = useState<boolean>(true);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const [browseMode, setBrowseMode] = useState<'map' | 'list'>('map');
+  const [selectedMapBayId, setSelectedMapBayId] = useState<string | null>(null);
+  const [routeTarget, setRouteTarget] = useState<{
+    bayCode: string;
+    floor: string;
+    zone?: string;
+    note?: string;
+  } | null>(null);
 
   const effectiveUserId = currentUserRole === 'resident' && currentUserId ? currentUserId : selectedUserId;
 
@@ -491,12 +510,12 @@ export const ResidentAppView: React.FC<Props> = ({
         </div>
       </section>
     ) : (
-      <section className="bg-slate-900 text-white rounded-2xl p-5 space-y-4">
+      <section className="bg-gradient-to-br from-[#6E41C4] via-[#5E33B1] to-[#4A2593] text-white rounded-3xl p-5 ps-card-shadow space-y-4">
         {bestAutoAssignOption ? (
           <>
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1.5">
-                <div className="inline-flex items-center gap-1.5 text-[11px] text-blue-300 font-medium">
+                <div className="inline-flex items-center gap-1.5 text-[11px] text-violet-200 font-semibold">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>{t(lang, 'بهترین پیشنهاد هوشمند', 'Best Smart Match')}</span>
                 </div>
@@ -505,7 +524,7 @@ export const ResidentAppView: React.FC<Props> = ({
                     .map((s) => `${s.resource.code} (${s.resource.floorOrZone})`)
                     .join(' → ')}
                 </div>
-                <div className="text-xs text-slate-300 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <div className="text-xs text-violet-100/90 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className="font-mono tabular-nums">
                     {formatMinutes(bestAutoAssignOption.segments[0].startMin)}–
                     {formatMinutes(bestAutoAssignOption.segments[bestAutoAssignOption.segments.length - 1].endMin)}
@@ -538,19 +557,40 @@ export const ResidentAppView: React.FC<Props> = ({
               })()}
             </div>
 
-            <button
-              type="button"
-              onClick={handleAutoAssign}
-              className="w-full min-h-[48px] text-sm font-semibold bg-white text-slate-900 rounded-xl hover:bg-blue-50 active:scale-[0.99] transition-all"
-            >
-              {bestAutoAssignOption.requiresManualApproval
-                ? t(lang, 'ارسال درخواست رزرو', 'Request Best Bay')
-                : t(lang, 'رزرو فوری همین جایگاه', 'Reserve Instantly')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleAutoAssign}
+                className="flex-1 min-h-[48px] text-sm font-bold bg-white text-[#5A2FA8] rounded-2xl hover:bg-[#F7F4FE] active:scale-[0.99] transition-all shadow-sm"
+              >
+                {bestAutoAssignOption.requiresManualApproval
+                  ? t(lang, 'ارسال درخواست رزرو', 'Request Best Bay')
+                  : t(lang, 'رزرو فوری همین جایگاه', 'Reserve Instantly')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const firstSeg = bestAutoAssignOption.segments[0].resource;
+                  setRouteTarget({
+                    bayCode: firstSeg.code,
+                    floor: firstSeg.floorOrZone,
+                    zone: firstSeg.spaceMeta?.block,
+                    note:
+                      lang === 'fa'
+                        ? firstSeg.spaceMeta?.locationNoteFa
+                        : firstSeg.spaceMeta?.locationNoteEn,
+                  });
+                }}
+                aria-label={t(lang, 'مسیریابی', 'Route')}
+                className="min-w-[48px] min-h-[48px] rounded-2xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors shrink-0"
+              >
+                <Navigation className="w-4 h-4" />
+              </button>
+            </div>
           </>
         ) : (
           <div className="space-y-3 text-center py-2">
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-violet-100 leading-relaxed">
               {t(lang, 'با فیلترهای انتخابی فعلی جای پارک خالی نیست.', 'No open bay matches these filters.')}
             </p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -558,7 +598,7 @@ export const ResidentAppView: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="min-h-[40px] px-4 text-xs font-semibold bg-white text-slate-900 rounded-xl"
+                  className="min-h-[40px] px-4 text-xs font-semibold bg-white text-[#5A2FA8] rounded-xl"
                 >
                   {t(lang, 'پاک کردن فیلترها', 'Clear Filters')}
                 </button>
@@ -566,7 +606,7 @@ export const ResidentAppView: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setShowExtendedForm(true)}
-                className="min-h-[40px] px-4 text-xs font-medium border border-slate-700 text-slate-200 rounded-xl hover:bg-slate-800"
+                className="min-h-[40px] px-4 text-xs font-medium border border-white/30 text-white rounded-xl hover:bg-white/10"
               >
                 {t(lang, 'هماهنگی با مدیر ساختمان', 'Ask Building Manager')}
               </button>
@@ -576,56 +616,100 @@ export const ResidentAppView: React.FC<Props> = ({
       </section>
     );
 
+  // Build interactive top-down floor map slots from real building resources + live availability
+  const matchingCandidateByResourceId = useMemo(
+    () => new Map(matchingAvailableList.map((c) => [c.resource.id, c])),
+    [matchingAvailableList]
+  );
+
+  const floorMapSlots: FloorMapSlot[] = useMemo(() => {
+    const scopedResources = resources.filter(
+      (r) => r.type === 'parking' && (!sameBuildingOnly || r.communityId === requester.communityId)
+    );
+    return scopedResources.map((r) => {
+      const cand = matchingCandidateByResourceId.get(r.id);
+      return {
+        id: r.id,
+        code: r.code,
+        floor: r.floorOrZone,
+        zone: r.spaceMeta?.block || 'A',
+        available: Boolean(cand),
+        evCharging: Boolean(r.evCharging),
+        isFree: r.pricing.isFree,
+        hourlyEur: r.pricing.hourlyEur,
+        category: r.spaceMeta?.category,
+        note: lang === 'fa' ? r.spaceMeta?.locationNoteFa : r.spaceMeta?.locationNoteEn,
+      };
+    });
+  }, [resources, sameBuildingOnly, requester.communityId, matchingCandidateByResourceId, lang]);
+
+  const activeCategoryTileId = evOnly
+    ? 'ev'
+    : categoryFilter === 'motorcycle' || categoryFilter === 'wide' || categoryFilter === 'accessible'
+      ? categoryFilter
+      : 'ALL';
+
+  const handleCategoryTileSelect = (tileId: string) => {
+    if (tileId === 'ALL') {
+      setCategoryFilter('ALL');
+      setEvOnly(false);
+    } else if (tileId === 'ev') {
+      setCategoryFilter('ALL');
+      setEvOnly((prev) => !prev);
+    } else {
+      setEvOnly(false);
+      setCategoryFilter((prev) => (prev === tileId ? 'ALL' : tileId));
+    }
+  };
+
   return (
-    <div className="max-w-6xl mx-auto space-y-5 pb-6">
-      {/* Adaptive Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-            {t(lang, 'رزرو پارکینگ موقت', 'Temporary Parking')}
-          </h1>
-          <div className="mt-0.5 text-xs text-slate-500 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span className="font-medium text-slate-700">
-              {lang === 'fa' ? homeCommunity.nameFa : homeCommunity.name}
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>
-              {t(lang, 'واحد', 'Unit')} {requester.unitNumber ?? '—'}
-            </span>
-          </div>
-        </div>
+    <div className="max-w-6xl mx-auto space-y-5 pb-8">
+      {/* Signature ParkShare Lavender-Orchid Hero Banner */}
+      <PSHeroBanner
+        greeting={`${lang === 'fa' ? homeCommunity.nameFa : homeCommunity.name} · ${t(lang, 'واحد', 'Unit')} ${requester.unitNumber ?? '—'}`}
+        headline={t(lang, 'جای پارک خود را پیدا کنید', 'Find your Parking Space', 'Vind uw parkeerplek')}
+        rightSlot={
+          <div className="flex flex-wrap items-center gap-2">
+            {currentUserRole === 'manager' && residentUsers.length > 1 && (
+              <select
+                aria-label={t(lang, 'انتخاب کاربر برای پیش‌نمایش', 'Select resident preview')}
+                value={effectiveUserId}
+                onChange={(e) => {
+                  setSelectedUserId(e.target.value);
+                  setFloorFilter('ALL');
+                  setFeedback(null);
+                  setShowExtendedForm(false);
+                }}
+                className="h-10 max-w-[200px] px-3 text-xs font-medium bg-white/95 text-slate-900 rounded-xl truncate"
+              >
+                {residentUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {lang === 'fa' ? u.nameFa : u.name}
+                  </option>
+                ))}
+              </select>
+            )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          {currentUserRole === 'manager' && residentUsers.length > 1 && (
-            <select
-              aria-label={t(lang, 'انتخاب کاربر برای پیش‌نمایش', 'Select resident preview')}
-              value={effectiveUserId}
-              onChange={(e) => {
-                setSelectedUserId(e.target.value);
-                setFloorFilter('ALL');
-                setFeedback(null);
-                setShowExtendedForm(false);
-              }}
-              className="h-11 max-w-[220px] px-3 text-xs font-medium bg-white border border-slate-200 rounded-xl text-slate-900 truncate"
+            <button
+              type="button"
+              onClick={() => setShowPrivacySheet((v) => !v)}
+              className="min-h-[40px] inline-flex items-center gap-1.5 px-3.5 text-xs font-semibold text-white bg-white/20 hover:bg-white/30 backdrop-blur-xs rounded-xl transition-colors whitespace-nowrap"
             >
-              {residentUsers.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {lang === 'fa' ? u.nameFa : u.name}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setShowPrivacySheet((v) => !v)}
-            className="min-h-[42px] inline-flex items-center gap-1.5 px-3.5 text-xs font-medium text-emerald-900 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100/70 transition-colors whitespace-nowrap"
-          >
-            <Lock className="w-3.5 h-3.5 text-emerald-700" />
-            <span>{t(lang, 'هویت مخفی', 'Identity Hidden')}</span>
-          </button>
+              <Lock className="w-3.5 h-3.5" />
+              <span>{t(lang, 'هویت مخفی', 'Identity Hidden')}</span>
+            </button>
+          </div>
+        }
+      >
+        {/* Pastel Circular Category Tiles inside crisp white floating dock */}
+        <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-3.5 sm:p-4 text-slate-900">
+          <PSVehicleCategoryTiles
+            lang={lang}
+            selectedId={activeCategoryTileId}
+            onSelect={handleCategoryTileSelect}
+          />
         </div>
-      </div>
+      </PSHeroBanner>
 
       {/* Collapsible Privacy Control Sheet */}
       {showPrivacySheet && (
@@ -770,10 +854,10 @@ export const ResidentAppView: React.FC<Props> = ({
                       key={p.h}
                       type="button"
                       onClick={() => applyQuickDuration(p.h)}
-                      className={`min-h-[38px] px-3 text-xs font-medium rounded-xl border transition-colors whitespace-nowrap ${
+                      className={`min-h-[38px] px-3.5 text-xs font-semibold rounded-xl border transition-all whitespace-nowrap ${
                         active
-                          ? 'bg-slate-900 border-slate-900 text-white'
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          ? 'ps-coral-btn border-transparent text-white'
+                          : 'bg-[#FAF9FE] border-[#ECE9F7] text-slate-700 hover:bg-[#F4EFFD]'
                       }`}
                     >
                       {lang === 'fa' ? p.fa : p.en}
@@ -786,8 +870,10 @@ export const ResidentAppView: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setFreeOnly((v) => !v)}
-                  className={`min-h-[38px] px-3 text-xs font-medium rounded-xl border transition-colors whitespace-nowrap ${
-                    freeOnly ? 'bg-blue-700 border-blue-700 text-white' : 'bg-white border-slate-200 text-slate-700'
+                  className={`min-h-[38px] px-3 text-xs font-semibold rounded-xl border transition-colors whitespace-nowrap ${
+                    freeOnly
+                      ? 'bg-[#6E41C4] border-[#6E41C4] text-white'
+                      : 'bg-white border-[#ECE9F7] text-slate-700 hover:bg-[#F4EFFD]'
                   }`}
                 >
                   {t(lang, 'رایگان', 'Free')}
@@ -795,8 +881,10 @@ export const ResidentAppView: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setAutoApproveOnly((v) => !v)}
-                  className={`min-h-[38px] px-3 text-xs font-medium rounded-xl border transition-colors whitespace-nowrap ${
-                    autoApproveOnly ? 'bg-blue-700 border-blue-700 text-white' : 'bg-white border-slate-200 text-slate-700'
+                  className={`min-h-[38px] px-3 text-xs font-semibold rounded-xl border transition-colors whitespace-nowrap ${
+                    autoApproveOnly
+                      ? 'bg-[#6E41C4] border-[#6E41C4] text-white'
+                      : 'bg-white border-[#ECE9F7] text-slate-700 hover:bg-[#F4EFFD]'
                   }`}
                 >
                   {t(lang, 'فوری', 'Instant')}
@@ -804,8 +892,10 @@ export const ResidentAppView: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setEvOnly((v) => !v)}
-                  className={`min-h-[38px] inline-flex items-center gap-1 px-3 text-xs font-medium rounded-xl border transition-colors whitespace-nowrap ${
-                    evOnly ? 'bg-blue-700 border-blue-700 text-white' : 'bg-white border-slate-200 text-slate-700'
+                  className={`min-h-[38px] inline-flex items-center gap-1 px-3 text-xs font-semibold rounded-xl border transition-colors whitespace-nowrap ${
+                    evOnly
+                      ? 'bg-[#17A373] border-[#17A373] text-white'
+                      : 'bg-white border-[#ECE9F7] text-slate-700 hover:bg-[#E5F7F0]'
                   }`}
                 >
                   <Zap className="w-3.5 h-3.5" />
@@ -814,10 +904,10 @@ export const ResidentAppView: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setShowFilters((v) => !v)}
-                  className={`min-h-[38px] inline-flex items-center gap-1.5 px-3 text-xs font-medium rounded-xl border transition-colors whitespace-nowrap ${
+                  className={`min-h-[38px] inline-flex items-center gap-1.5 px-3 text-xs font-semibold rounded-xl border transition-colors whitespace-nowrap ${
                     showFilters || advancedFiltersCount > 0
-                      ? 'bg-blue-50 border-blue-200 text-blue-800'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      ? 'bg-[#F4EFFD] border-[#D8CAFA] text-[#5A2FA8]'
+                      : 'bg-white border-[#ECE9F7] text-slate-700 hover:bg-[#F4EFFD]'
                   }`}
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -999,118 +1089,143 @@ export const ResidentAppView: React.FC<Props> = ({
             </form>
           )}
 
-          {/* Available Parking Bays List */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between px-0.5">
-              <h2 className="text-sm font-bold text-slate-900">
-                {t(
-                  lang,
-                  `جایگاه‌های آزاد در این ساعت (${matchingAvailableList.length})`,
-                  `Available Bays (${matchingAvailableList.length})`
+          {/* In-Garage Route Guidance Panel (Shown when user taps Route on any bay or booking) */}
+          {routeTarget && (
+            <PSRouteGuidanceCard
+              lang={lang}
+              bayCode={routeTarget.bayCode}
+              floor={routeTarget.floor}
+              zone={routeTarget.zone}
+              distanceMeters={routeTarget.floor.includes('2') ? 110 : 65}
+              locationNote={routeTarget.note}
+              onClose={() => setRouteTarget(null)}
+            />
+          )}
+
+          {/* Available Parking Bays: Interactive Floor Blueprint OR Refined Card List */}
+          <section className="space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-900">
+                  {t(
+                    lang,
+                    `جایگاه‌های آزاد (${matchingAvailableList.length})`,
+                    `Available Spaces (${matchingAvailableList.length})`,
+                    `Beschikbare plekken (${matchingAvailableList.length})`
+                  )}
+                </h2>
+                {totalActiveFilters > 0 && (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="text-xs font-semibold text-[#6E41C4] hover:underline"
+                  >
+                    {t(lang, 'نمایش همه', 'Show all')}
+                  </button>
                 )}
-              </h2>
-              {totalActiveFilters > 0 && (
+              </div>
+
+              {/* Clean Segmented Switcher: Visual Map vs List */}
+              <div className="inline-grid grid-cols-2 gap-0.5 p-1 bg-white border border-[#ECE9F7] rounded-xl text-xs">
                 <button
                   type="button"
-                  onClick={resetFilters}
-                  className="text-xs font-medium text-blue-700 hover:underline"
+                  onClick={() => setBrowseMode('map')}
+                  className={`min-h-[34px] px-3 rounded-lg font-semibold inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap ${
+                    browseMode === 'map'
+                      ? 'bg-[#6E41C4] text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
                 >
-                  {t(lang, 'نمایش همه', 'Show all')}
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>{t(lang, 'نقشه طبقات', 'Floor Map', 'Plattegrond')}</span>
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setBrowseMode('list')}
+                  className={`min-h-[34px] px-3 rounded-lg font-semibold inline-flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap ${
+                    browseMode === 'list'
+                      ? 'bg-[#6E41C4] text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span>{t(lang, 'فهرست', 'List', 'Lijst')}</span>
+                </button>
+              </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100 overflow-hidden">
-              {matchingAvailableList.length === 0 ? (
-                <div className="p-8 text-center space-y-2">
-                  <p className="text-sm font-medium text-slate-700">
-                    {t(lang, 'در این ساعت و فیلتر پارکینگ خالی یافت نشد.', 'No open bays found for this time and filter.')}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {t(lang, 'ساعت یا فیلترها را تغییر دهید تا گزینه‌های بیشتر نمایش داده شوند.', 'Adjust your hours or clear filters to see more spots.')}
-                  </p>
-                </div>
-              ) : (
-                matchingAvailableList.map((cand) => {
+            {browseMode === 'map' ? (
+              <PSFloorBayMap
+                lang={lang}
+                slots={floorMapSlots}
+                floors={availableFloors.length > 0 ? availableFloors : homeCommunity.floors}
+                activeFloor={floorFilter}
+                onSelectFloor={setFloorFilter}
+                selectedSlotId={selectedMapBayId}
+                onSelectSlot={(slot) => setSelectedMapBayId(slot.id)}
+                bookingDisabled={Boolean(fairUseViolation)}
+                timeSummary={`${formatMinutes(startMin)}–${formatMinutes(validEndMin)}`}
+                onOpenRoute={(slot) =>
+                  setRouteTarget({
+                    bayCode: slot.code,
+                    floor: slot.floor,
+                    zone: slot.zone,
+                    note: slot.note,
+                  })
+                }
+                onBookSelected={(slot) => {
+                  const cand = matchingCandidateByResourceId.get(slot.id);
+                  if (cand) {
+                    handleDirectBookCandidate(cand);
+                  }
+                }}
+              />
+            ) : matchingAvailableList.length === 0 ? (
+              <div className="bg-white border border-[#ECE9F7] rounded-3xl p-8 text-center space-y-2.5">
+                <p className="text-sm font-semibold text-slate-700">
+                  {t(lang, 'در این ساعت و فیلتر پارکینگ خالی یافت نشد.', 'No open bays found for this time and filter.')}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {t(lang, 'ساعت یا فیلترها را تغییر دهید تا گزینه‌های بیشتر نمایش داده شوند.', 'Adjust your hours or clear filters to see more spots.')}
+                </p>
+                {totalActiveFilters > 0 && (
+                  <PSButton variant="soft" size="sm" onClick={resetFilters}>
+                    {t(lang, 'پاک کردن فیلترها', 'Clear Filters')}
+                  </PSButton>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {matchingAvailableList.map((cand) => {
                   const r = cand.resource;
                   const stat = ratingsByResource.get(r.id);
+                  const slotLabel = cand.availableSlots
+                    .slice(0, 1)
+                    .map((s) => `${formatMinutes(s.startMin)}–${formatMinutes(s.endMin)}`)
+                    .join('');
 
                   return (
-                    <div
+                    <PSBayListCard
                       key={r.id}
-                      className="p-4 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors"
-                    >
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                          <span className="font-mono text-sm font-bold text-blue-800">{r.code}</span>
-                          {r.spaceMeta?.block && (
-                            <span className="text-xs font-semibold text-slate-700">
-                              {t(lang, 'بلوک', 'Blk')} {r.spaceMeta.block}
-                            </span>
-                          )}
-                          <span className="text-slate-300">·</span>
-                          <span className="text-xs font-mono text-slate-600">{r.floorOrZone}</span>
-                          <span className="text-slate-300">·</span>
-                          <span className="text-xs font-mono tabular-nums text-slate-500">
-                            {r.dimensions.widthM}×{r.dimensions.lengthM}m
-                          </span>
-                          {stat && (
-                            <>
-                              <span className="text-slate-300">·</span>
-                              <span className="inline-flex items-center gap-0.5 text-xs font-mono text-amber-600">
-                                <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
-                                {stat.avg.toFixed(1)}
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        {r.spaceMeta?.locationNoteFa && (
-                          <div className="text-xs text-slate-600 truncate">
-                            {lang === 'fa' ? r.spaceMeta.locationNoteFa : r.spaceMeta.locationNoteEn}
-                          </div>
-                        )}
-
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
-                          <span className="font-semibold text-slate-900">
-                            {r.pricing.isFree ? t(lang, 'رایگان', 'Free') : `€${r.pricing.hourlyEur.toFixed(1)}/h`}
-                          </span>
-                          <span>·</span>
-                          <span>
-                            {r.approvalMode === 'automatic' ? t(lang, 'تأیید فوری', 'Instant') : t(lang, 'تأیید مالک', 'Approval')}
-                          </span>
-                          {r.evCharging && (
-                            <>
-                              <span>·</span>
-                              <span className="text-emerald-700 font-semibold">
-                                EV{r.features?.evPowerKw ? ` ${r.features.evPowerKw}kW` : ''}
-                              </span>
-                            </>
-                          )}
-                          <span>·</span>
-                          <span className="inline-flex items-center gap-1 font-mono tabular-nums">
-                            <Clock className="w-3 h-3 text-slate-400" />
-                            {cand.availableSlots
-                              .slice(0, 1)
-                              .map((s) => `${formatMinutes(s.startMin)}–${formatMinutes(s.endMin)}`)
-                              .join('')}
-                          </span>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={Boolean(fairUseViolation)}
-                        onClick={() => handleDirectBookCandidate(cand)}
-                        className="min-h-[42px] px-4 text-xs font-semibold bg-blue-700 text-white rounded-xl hover:bg-blue-800 disabled:opacity-35 transition-colors whitespace-nowrap shrink-0"
-                      >
-                        {t(lang, 'رزرو', 'Book')}
-                      </button>
-                    </div>
+                      lang={lang}
+                      resource={r}
+                      slotLabel={slotLabel}
+                      rating={stat}
+                      disabled={Boolean(fairUseViolation)}
+                      onBook={() => handleDirectBookCandidate(cand)}
+                      onRoute={() =>
+                        setRouteTarget({
+                          bayCode: r.code,
+                          floor: r.floorOrZone,
+                          zone: r.spaceMeta?.block,
+                          note: lang === 'fa' ? r.spaceMeta?.locationNoteFa : r.spaceMeta?.locationNoteEn,
+                        })
+                      }
+                    />
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )}
           </section>
         </div>
 
@@ -1216,11 +1331,32 @@ export const ResidentAppView: React.FC<Props> = ({
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {res && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setRouteTarget({
+                                  bayCode: res.code,
+                                  floor: res.floorOrZone,
+                                  zone: res.spaceMeta?.block,
+                                  note:
+                                    lang === 'fa'
+                                      ? res.spaceMeta?.locationNoteFa
+                                      : res.spaceMeta?.locationNoteEn,
+                                })
+                              }
+                              aria-label={t(lang, 'مسیریابی', 'Route')}
+                              className="min-w-[38px] min-h-[38px] flex items-center justify-center text-[#6E41C4] bg-[#F4EFFD] hover:bg-[#EAE0FB] rounded-xl"
+                            >
+                              <Navigation className="w-4 h-4" />
+                            </button>
+                          )}
+
                           {!alreadyReviewed ? (
                             <button
                               type="button"
                               onClick={() => setReviewingReservationId(isOpen ? null : rsv.id)}
-                              className="min-h-[38px] inline-flex items-center gap-1 px-3 text-xs font-medium text-blue-700 bg-blue-50 rounded-xl hover:bg-blue-100 whitespace-nowrap"
+                              className="min-h-[38px] inline-flex items-center gap-1 px-3 text-xs font-semibold text-[#5A2FA8] bg-[#F4EFFD] rounded-xl hover:bg-[#EAE0FB] whitespace-nowrap"
                             >
                               <MessageSquarePlus className="w-3.5 h-3.5" />
                               {t(lang, 'امتیاز', 'Rate')}
