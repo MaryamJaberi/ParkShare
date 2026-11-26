@@ -10,6 +10,7 @@ import type {
   BlockedAccessAttempt,
   BuildingInviteLink,
   BuildingRosterEntry,
+  BuildingWhatsAppGroupConfig,
   Community,
   ExtendedParkingRequest,
   FairUsePolicy,
@@ -1275,6 +1276,97 @@ async function startServer() {
     res.json(buildScopedStateForSession(req.session!));
   });
 
+  // 10b. Manager: Connect & Save Building WhatsApp Group Settings
+  app.patch('/api/manager/buildings/:id/whatsapp-group', requireAuth, requireManager, (req: AuthedRequest, res) => {
+    const id = req.params.id;
+    const ownedIds = getManagerCommunityIds(req.session!.accountId);
+    if (!ownedIds.has(id)) {
+      res.status(403).json({
+        errorFa: 'شما مجاز به ویرایش تنظیمات این ساختمان نیستید.',
+        errorEn: 'Forbidden: building belongs to another manager.',
+      });
+      return;
+    }
+
+    const comm = store.communities.find((c) => c.id === id);
+    if (!comm) {
+      res.status(404).json({ errorFa: 'ساختمان یافت نشد.', errorEn: 'Building not found.' });
+      return;
+    }
+
+    const body = (req.body ?? {}) as Partial<BuildingWhatsAppGroupConfig>;
+    const rawGroupName = String(body.groupName ?? '').trim().slice(0, 80);
+    const groupName = rawGroupName || comm.nameFa || comm.name;
+
+    const rawInviteUrl = String(body.groupInviteUrl ?? '').trim();
+    let safeInviteUrl: string | undefined;
+    if (rawInviteUrl) {
+      try {
+        const parsed = new URL(rawInviteUrl);
+        if (parsed.protocol !== 'https:' || parsed.hostname !== 'chat.whatsapp.com' || parsed.pathname.length < 4) {
+          res.status(400).json({
+            errorFa: 'لینک دعوت گروه باید یک آدرس معتبر https://chat.whatsapp.com/... باشد.',
+            errorEn: 'Group invite link must be a valid https://chat.whatsapp.com/... URL.',
+          });
+          return;
+        }
+        safeInviteUrl = parsed.toString();
+      } catch {
+        res.status(400).json({
+          errorFa: 'فرمت لینک دعوت گروه واتساپ معتبر نیست.',
+          errorEn: 'Invalid WhatsApp group invite URL format.',
+        });
+        return;
+      }
+    }
+
+    const rawBotPhone = String(body.botPhoneNumber ?? '').trim();
+    let safeBotPhone: string | undefined;
+    if (rawBotPhone) {
+      const cleaned = rawBotPhone.replace(/[\s\-()]/g, '');
+      const digitsOnly = cleaned.replace(/^\+/, '');
+      if (!/^\d{7,15}$/.test(digitsOnly)) {
+        res.status(400).json({
+          errorFa: 'شماره واتساپ باید بین ۷ تا ۱۵ رقم همراه با کد کشور باشد (مثلاً +31612345678).',
+          errorEn: 'WhatsApp number must be 7–15 digits including country code (e.g. +31612345678).',
+        });
+        return;
+      }
+      safeBotPhone = cleaned.startsWith('+') ? cleaned : `+${digitsOnly}`;
+    }
+
+    const nextConfig: BuildingWhatsAppGroupConfig = {
+      enabled: body.enabled !== false,
+      groupName,
+      groupInviteUrl: safeInviteUrl,
+      botPhoneNumber: safeBotPhone,
+      defaultLanguage: body.defaultLanguage === 'en' ? 'en' : 'fa',
+      pinnedConfirmed: Boolean(body.pinnedConfirmed),
+      connectedAt: comm.whatsappGroup?.connectedAt || new Date().toISOString(),
+    };
+
+    store.communities = store.communities.map((c) =>
+      c.id === id ? { ...c, whatsappGroup: nextConfig } : c
+    );
+
+    store.privacyAudits.unshift({
+      id: `aud-wa-grp-${Date.now()}`,
+      communityId: id,
+      timestamp: nowCet(),
+      category: 'federation_verified',
+      summaryFa: nextConfig.pinnedConfirmed
+        ? `اتصال گروه واتساپ «${groupName}» به بات خصوصی ۱ به ۱ تأیید و فعال شد.`
+        : `تنظیمات اتصال گروه واتساپ «${groupName}» در پنل مدیر ذخیره شد.`,
+      summaryEn: nextConfig.pinnedConfirmed
+        ? `WhatsApp group "${groupName}" confirmed and linked to private 1-on-1 bot.`
+        : `WhatsApp group "${groupName}" settings saved by manager.`,
+      proofTag: 'WHATSAPP-GROUP-LINKED',
+    });
+
+    saveStore();
+    res.json(buildScopedStateForSession(req.session!));
+  });
+
   // 11. Manager: Rotate Encryption Key (CMK)
   app.post('/api/manager/buildings/:id/rotate-key', requireAuth, requireManager, (req: AuthedRequest, res) => {
     const id = req.params.id;
@@ -2143,7 +2235,12 @@ async function startServer() {
   });
 
   // Mount Vite middleware in dev or serve static dist in prod
-  const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.K_SERVICE);
+  const distDir = path.resolve(process.cwd(), 'dist');
+  const distIndex = path.join(distDir, 'index.html');
+  const isProd =
+    (process.env.NODE_ENV === 'production' || process.env.npm_lifecycle_event === 'start') &&
+    fs.existsSync(distIndex);
+
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -2152,10 +2249,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distDir = path.resolve(process.cwd(), 'dist');
     app.use(express.static(distDir));
     app.get('*', (_req, res) => {
-      res.sendFile(path.join(distDir, 'index.html'));
+      res.sendFile(distIndex);
     });
   }
 

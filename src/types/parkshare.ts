@@ -74,6 +74,18 @@ export interface Community {
     namingPattern?: string;
     exampleCode?: string;
   };
+  /** Per-building GDPR-first WhatsApp Group connection & pinned bot configuration */
+  whatsappGroup?: BuildingWhatsAppGroupConfig;
+}
+
+export interface BuildingWhatsAppGroupConfig {
+  enabled: boolean;
+  groupName: string;
+  groupInviteUrl?: string;
+  botPhoneNumber?: string;
+  defaultLanguage: 'fa' | 'en';
+  pinnedConfirmed: boolean;
+  connectedAt?: string;
 }
 
 export interface FairUsePolicy {

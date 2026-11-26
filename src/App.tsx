@@ -21,6 +21,7 @@ import {
   BlockedAccessAttempt,
   BuildingInviteLink,
   BuildingRosterEntry,
+  BuildingWhatsAppGroupConfig,
   Community,
   ExtendedParkingRequest,
   FairUsePolicy,
@@ -684,6 +685,35 @@ export default function App() {
     }
   }, [apiFetch]);
 
+  const handleUpdateWhatsAppGroup = useCallback(
+    async (
+      communityId: string,
+      config: BuildingWhatsAppGroupConfig
+    ): Promise<{ ok: boolean; error?: string }> => {
+      try {
+        const res = await apiFetch(`/api/manager/buildings/${communityId}/whatsapp-group`, {
+          method: 'PATCH',
+          body: JSON.stringify(config),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          return {
+            ok: false,
+            error: lang === 'fa' ? data.errorFa || data.error : data.errorEn || data.error,
+          };
+        }
+        applyServerState(data);
+        return { ok: true };
+      } catch {
+        return {
+          ok: false,
+          error: lang === 'fa' ? 'خطا در ارتباط با سرور.' : 'Server connection error.',
+        };
+      }
+    },
+    [apiFetch, applyServerState, lang]
+  );
+
   // Loading bootstrap state
   if (!authReady) {
     return (
@@ -1176,6 +1206,7 @@ export default function App() {
                   }
                   onSimulateWhatsApp={handleSimulateWhatsApp}
                   onFetchWhatsAppConfig={handleFetchWhatsAppConfig}
+                  onUpdateWhatsAppGroup={handleUpdateWhatsAppGroup}
                 />
               )}
 

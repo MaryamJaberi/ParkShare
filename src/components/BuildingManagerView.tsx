@@ -27,6 +27,7 @@ import {
   BlockedAccessAttempt,
   BuildingInviteLink,
   BuildingRosterEntry,
+  BuildingWhatsAppGroupConfig,
   Community,
   ExtendedParkingRequest,
   FairUsePolicy,
@@ -82,6 +83,10 @@ interface Props {
     privacyMode: string;
     webhookPath: string;
   } | null>;
+  onUpdateWhatsAppGroup: (
+    communityId: string,
+    config: BuildingWhatsAppGroupConfig
+  ) => Promise<{ ok: boolean; error?: string }>;
 }
 
 const SAMPLE_CSV = `bay_code,floor,owner_name,unit,email,phone,ev_charger,height_m
@@ -187,6 +192,7 @@ export const BuildingManagerView: React.FC<Props> = ({
   onLogBuildingExport,
   onSimulateWhatsApp,
   onFetchWhatsAppConfig,
+  onUpdateWhatsAppGroup,
 }) => {
   const [selectedCommunityId, setSelectedCommunityId] = useState<string>(communities[0]?.id ?? '');
   const [activeSection, setActiveSection] = useState<ManagerSection>('overview');
@@ -1920,15 +1926,21 @@ export const BuildingManagerView: React.FC<Props> = ({
         </div>
       )}
 
-      {/* TAB 5: EUROPEAN GDPR-FIRST WHATSAPP 1-ON-1 BOT HUB */}
+      {/* TAB 5: EUROPEAN GDPR-FIRST WHATSAPP GROUP CONNECTION & 1-ON-1 BOT HUB */}
       {activeSection === 'whatsapp' && (
         <WhatsAppBotPanel
           lang={lang}
           role="manager"
           community={activeCommunity}
           rosterEntries={buildingRoster}
+          activeInviteToken={
+            inviteLinks.find((l) => activeCommunity && l.communityId === activeCommunity.id && l.active)
+              ?.token
+          }
           onSimulateMessage={onSimulateWhatsApp}
           onFetchConfig={onFetchWhatsAppConfig}
+          onSaveWhatsAppGroup={onUpdateWhatsAppGroup}
+          onOpenRoster={() => setActiveSection('roster')}
         />
       )}
     </div>
