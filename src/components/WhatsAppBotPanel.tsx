@@ -113,7 +113,7 @@ export const WhatsAppBotPanel: React.FC<Props> = ({
   const [groupName, setGroupName] = useState<string>('');
   const [groupInviteUrl, setGroupInviteUrl] = useState<string>('');
   const [botPhoneNumber, setBotPhoneNumber] = useState<string>('');
-  const [pinLang, setPinLang] = useState<'fa' | 'en'>(lang);
+  const [pinLang, setPinLang] = useState<'fa' | 'en'>(lang === 'fa' ? 'fa' : 'en');
   const [savingGroup, setSavingGroup] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -135,7 +135,7 @@ export const WhatsAppBotPanel: React.FC<Props> = ({
     );
     setGroupInviteUrl(wg?.groupInviteUrl || '');
     setBotPhoneNumber(wg?.botPhoneNumber || config?.displayNumber || '');
-    setPinLang(wg?.defaultLanguage || lang);
+    setPinLang(wg?.defaultLanguage || (lang === 'fa' ? 'fa' : 'en'));
     setSaveFeedback(null);
   }, [community?.id, community?.whatsappGroup, config?.displayNumber, lang]);
 
