@@ -106,6 +106,9 @@ export const DirectNeighborShareView: React.FC<Props> = ({
   // Share & copy feedback
   const [copiedMode, setCopiedMode] = useState<'link' | 'wa' | null>(null);
 
+  // Step-by-step guide accordion
+  const [showGuide, setShowGuide] = useState(false);
+
   // Guest self-cancel state
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [guestCancelCode, setGuestCancelCode] = useState('');
@@ -461,6 +464,18 @@ export const DirectNeighborShareView: React.FC<Props> = ({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() => setShowGuide((v) => !v)}
+            className={`inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-bold rounded-xl border transition-colors ${
+              showGuide
+                ? 'bg-[#F5F1FD] border-[#6E41C4] text-[#5A2FA8]'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <CalendarClock className="w-4 h-4" />
+            {t(lang, 'راهنمای قدم‌به‌قدم (رزرو و لغو)', 'Step-by-Step Guide (Book & Cancel)', 'Stappenplan (Boeken & Annuleren)')}
+          </button>
+          <button
+            type="button"
             onClick={() => setShowAddSpot(true)}
             className="inline-flex items-center gap-1.5 min-h-[40px] px-4 py-2 text-xs font-bold text-white ps-violet-btn rounded-xl"
           >
@@ -469,6 +484,80 @@ export const DirectNeighborShareView: React.FC<Props> = ({
           </button>
         </div>
       </div>
+
+      {/* Step-by-Step Guide (How to Book, How to Cancel as Guest vs Owner, Fair-Use & Adding Your Spot) */}
+      {showGuide && (
+        <section className="bg-white border border-[#E4DCF7] rounded-3xl p-5 sm:p-6 ps-card-shadow space-y-4">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
+              {t(
+                lang,
+                'راهنمای قدم‌به‌قدم رزرو، لغو و اشتراک‌گذاری پارکینگ',
+                'Step-by-Step Guide: Booking, Cancelling & Sharing',
+                'Stappenplan: Reserveren, Annuleren & Delen'
+              )}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowGuide(false)}
+              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"
+              aria-label={t(lang, 'بستن', 'Close', 'Sluiten')}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div className="p-4 rounded-2xl bg-[#F8F6FD] border border-[#E6E0F7] space-y-2">
+              <div className="font-extrabold text-[#5A2FA8]">
+                {t(lang, '۱. چطور پارکینگ رزرو کنم؟', '1. How to Reserve a Spot', '1. Hoe reserveer ik een plek?')}
+              </div>
+              <ol className="list-decimal ps-4 space-y-1.5 text-slate-700 leading-relaxed">
+                <li>{t(lang, 'تاریخ و ساعت شروع و پایان را انتخاب کنید (تا ۲۴ ساعت).', 'Pick start & end date/time (up to 24 hours).', 'Kies begin- en einddatum/tijd (tot max. 24 uur).')}</li>
+                <li>{t(lang, 'نام، شماره تماس/واتساپ و شماره واحد خود را وارد کنید (فقط برای مالک قابل مشاهده است).', 'Enter your name, phone/WhatsApp, and unit (visible only to the owner).', 'Vul uw naam, telefoon/WhatsApp en huisnummer in (alleen zichtbaar voor de eigenaar).')}</li>
+                <li>{t(lang, 'دکمه تأیید رزرو را بزنید و کد ۶ کاراکتری لغو را نگه دارید.', 'Confirm booking and save the 6-character cancel code shown in the green box.', 'Bevestig en bewaar de 6-tekens annuleringscode uit het groene vak.')}</li>
+              </ol>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200/80 space-y-2">
+              <div className="font-extrabold text-rose-800">
+                {t(lang, '۲. چطور یک رزرو را لغو (باطل) کنم؟', '2. How to Cancel a Booking', '2. Hoe annuleer ik een reservering?')}
+              </div>
+              <ul className="space-y-2 text-slate-700 leading-relaxed">
+                <li>
+                  <strong className="text-slate-900">{t(lang, 'اگر همسایه رزروکننده هستید:', 'As the guest:', 'Als huurder / buur:')}</strong>{' '}
+                  {t(
+                    lang,
+                    'در لیست «رزروهای ثبت‌شده» روی «لغو با کد» بزنید، کد ۶ کاراکتری که هنگام رزرو دریافت کردید را وارد و روی «لغو» کلیک کنید. (اگر کد را گم کردید، به مالک پیام دهید.)',
+                    'Click "Cancel with code" on your booking, enter the 6-char code shown when you booked, and click Cancel. (Lost your code? Ask the spot owner.)',
+                    'Klik op "Annuleren met code", vul de 6-tekens code in die u na het boeken kreeg en klik op Annuleer. (Code kwijt? Vraag de eigenaar.)'
+                  )}
+                </li>
+                <li>
+                  <strong className="text-slate-900">{t(lang, 'اگر مالک پارکینگ هستید:', 'As the spot owner:', 'Als eigenaar van de plek:')}</strong>{' '}
+                  {t(
+                    lang,
+                    'نیازی به کد مهمان ندارید! پایین صفحه بخش «پنل خصوصی مالک» را باز کنید، پین خصوصی خود را بزنید و روی «لغو رزرو توسط مالک» کلیک کنید.',
+                    'No guest code needed! Open "Owner Panel" below, enter your private PIN, and click "Cancel booking (Owner)".',
+                    'Geen gastcode nodig! Open hieronder het "Eigenaar-paneel", voer uw pincode in en klik op "Annuleren (Eigenaar)".'
+                  )}
+                </li>
+              </ul>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-2">
+              <div className="font-extrabold text-emerald-900">
+                {t(lang, '۳. قوانین عادلانه و افزودن پارکینگ دیگران', '3. Fair-Use Rules & Adding Your Spot', '3. Spelregels & Eigen plek toevoegen')}
+              </div>
+              <ul className="space-y-1.5 text-slate-700 leading-relaxed">
+                <li>{t(lang, '• حداکثر ۲۴ ساعت در هر رزرو مستقیم.', '• Max 24 hours per instant booking.', '• Max. 24 uur per directe reservering.')}</li>
+                <li>{t(lang, '• برای ۲ روز پشت سر هم (فاصله کمتر از ۲۴ ساعت) ابتدا با مالک هماهنگ کنید.', '• Need 2 consecutive days? Coordinate with the owner first (24h gap rule).', '• 2 dagen achter elkaar nodig? Stem dit eerst af met de eigenaar (24u pauze).')}</li>
+                <li>{t(lang, '• همسایه‌های دیگر هم با دکمه «من هم پارکینگم را اضافه می‌کنم» می‌توانند جای پارکشان را اضافه کنند.', '• Other neighbors can click "Share My Spot Too" to add their own bay.', '• Andere buren kunnen via "Mijn plek ook delen" ook hun eigen plek toevoegen.')}</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
 
       {loadError && (
         <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium">
@@ -927,21 +1016,31 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                       </div>
 
                       {cancellingId === b.id && (
-                        <div className="flex items-center gap-2 pt-1">
-                          <input
-                            type="text"
-                            value={guestCancelCode}
-                            onChange={(e) => setGuestCancelCode(e.target.value)}
-                            placeholder={t(lang, 'کد ۶ رقمی لغو', '6-char cancel code', '6-tekens code')}
-                            className="flex-1 h-9 px-2.5 text-xs bg-white border border-slate-200 rounded-lg font-mono uppercase"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleCancelBooking(b.id, { cancelCode: guestCancelCode })}
-                            className="h-9 px-3 text-xs font-bold bg-rose-600 text-white rounded-lg"
-                          >
-                            {t(lang, 'لغو', 'Cancel', 'Annuleer')}
-                          </button>
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={guestCancelCode}
+                              onChange={(e) => setGuestCancelCode(e.target.value)}
+                              placeholder={t(lang, 'کد ۶ کاراکتری لغو', '6-char cancel code', '6-tekens code')}
+                              className="flex-1 h-9 px-2.5 text-xs bg-white border border-slate-200 rounded-lg font-mono uppercase"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleCancelBooking(b.id, { cancelCode: guestCancelCode })}
+                              className="h-9 px-3 text-xs font-bold bg-rose-600 text-white rounded-lg"
+                            >
+                              {t(lang, 'لغو', 'Cancel', 'Annuleer')}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-slate-500">
+                            {t(
+                              lang,
+                              'کد ۶ کاراکتری پس از ثبت رزرو نمایش داده شده است. اگر مالک پارکینگ هستید از «پنل خصوصی مالک» پایین صفحه بدون کد لغو کنید.',
+                              'Enter the 6-char code shown when you booked. Spot owners can cancel directly from the Owner Panel below without this code.',
+                              'Vul de 6-tekens code in die u na het boeken kreeg. De eigenaar kan zonder code annuleren via het Eigenaar-paneel hieronder.'
+                            )}
+                          </p>
                         </div>
                       )}
                     </div>
