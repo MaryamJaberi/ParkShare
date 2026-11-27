@@ -131,8 +131,8 @@ function createDefaultBoston177Spot(): StoredDirectSpot {
     buildingSlug: 'boston',
     buildingName: 'Boston Residence',
     bayNumber: '177',
-    floorOrZone: 'P1',
-    ownerDisplayName: 'Maryam (Plek 177)',
+    floorOrZone: 'P5',
+    ownerDisplayName: 'Maryam (P5 · Plek 177)',
     isFree: true,
     availabilityNote: 'Volledig beschikbaar voor tijdelijk gebruik / visite (gratis voor buren)',
     active: true,
@@ -176,8 +176,16 @@ function loadStore(): ParkShareStore {
     const merged: ParkShareStore = { ...createEmptyStore(), ...parsed };
     if (!Array.isArray(merged.directSpots) || merged.directSpots.length === 0) {
       merged.directSpots = [createDefaultBoston177Spot()];
-    } else if (!merged.directSpots.some((s) => s.slug === 'boston-177')) {
-      merged.directSpots.unshift(createDefaultBoston177Spot());
+    } else {
+      const b177 = merged.directSpots.find((s) => s.slug === 'boston-177');
+      if (!b177) {
+        merged.directSpots.unshift(createDefaultBoston177Spot());
+      } else if (b177.floorOrZone === 'P1') {
+        b177.floorOrZone = 'P5';
+        if (b177.ownerDisplayName === 'Maryam (Plek 177)') {
+          b177.ownerDisplayName = 'Maryam (P5 · Plek 177)';
+        }
+      }
     }
     if (!Array.isArray(merged.directBookings)) {
       merged.directBookings = [];
