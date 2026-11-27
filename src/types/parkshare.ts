@@ -737,3 +737,50 @@ export interface AdminOverviewPayload {
   })[];
 }
 
+// ============================================================================
+// Direct Neighbor Share (Managerless Peer-to-Peer Community Sharing)
+// ============================================================================
+
+export interface DirectShareFairUse {
+  maxHoursPerBooking: number;
+  maxDaysPerMonthPerGuest: number;
+  maxActiveBookingsPerGuest: number;
+  minGapHoursBetweenStays: number;
+}
+
+export interface DirectShareSpotPublic {
+  id: string;
+  slug: string;
+  buildingSlug: string;
+  buildingName: string;
+  bayNumber: string;
+  floorOrZone: string;
+  ownerDisplayName: string;
+  hasOwnerWhatsApp: boolean;
+  ownerPinClaimed: boolean;
+  isFree: boolean;
+  availabilityNote: string;
+  active: boolean;
+  fairUse: DirectShareFairUse;
+  createdAt: string;
+}
+
+export interface DirectShareBookingPublic {
+  id: string;
+  spotId: string;
+  startIso: string;
+  endIso: string;
+  status: 'Confirmed' | 'Cancelled';
+  purposeTag: 'visite' | 'temporary' | 'delivery';
+  createdAt: string;
+}
+
+export interface DirectShareBookingOwnerView extends DirectShareBookingPublic {
+  guestName: string;
+  guestPhone: string;
+  guestUnit: string;
+  guestPlate?: string;
+  note?: string;
+}
+
+

@@ -46,6 +46,7 @@ import { FederationPrivacyView } from './components/FederationPrivacyView';
 import { AdminSection, SuperAdminView } from './components/SuperAdminView';
 import { WhatsAppBotPanel } from './components/WhatsAppBotPanel';
 import { HelpInfographicGuide } from './components/HelpInfographicGuide';
+import { DirectNeighborShareView } from './components/DirectNeighborShareView';
 import {
   GuidedTourOverlay,
   PARKSHARE_TOUR_STORAGE_KEY,
@@ -127,6 +128,26 @@ export default function App() {
     const p = window.location.pathname.replace(/\/+$/, '');
     const params = new URLSearchParams(window.location.search);
     return p === '/admin' || params.get('admin') === '1';
+  });
+
+  // Direct Neighbor Share route detection (?spot=boston-177 or ?direct=boston) — works without Building Manager!
+  const [directShareRoute, setDirectShareRoute] = useState<{
+    active: boolean;
+    spotSlug: string | null;
+    buildingSlug: string | null;
+  }>(() => {
+    if (typeof window === 'undefined') return { active: false, spotSlug: null, buildingSlug: null };
+    const params = new URLSearchParams(window.location.search);
+    const spot = params.get('spot');
+    const direct = params.get('direct');
+    if (spot || direct) {
+      return {
+        active: true,
+        spotSlug: spot ? spot.trim().toLowerCase() : null,
+        buildingSlug: direct ? direct.trim().toLowerCase() : null,
+      };
+    }
+    return { active: false, spotSlug: null, buildingSlug: null };
   });
 
   // Invite token from URL (?invite=...) or when manager previews the neighbor signup link
@@ -789,7 +810,35 @@ export default function App() {
             {!previewInviteToken && (
               <button
                 type="button"
-                onClick={() => setShowHelpGuide((prev) => !prev)}
+                onClick={() => {
+                  setShowHelpGuide(false);
+                  setDirectShareRoute((prev) => ({
+                    active: !prev.active,
+                    spotSlug: prev.spotSlug || 'boston-177',
+                    buildingSlug: prev.buildingSlug || 'boston',
+                  }));
+                }}
+                className={`inline-flex items-center justify-center gap-1.5 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  directShareRoute.active
+                    ? 'bg-[#F46A46] text-white shadow-xs'
+                    : 'bg-[#FFF1EC] text-[#C84321] border border-[#FFD6C9] hover:bg-[#FFE4DB]'
+                }`}
+              >
+                <Car className="w-4 h-4 shrink-0" />
+                <span>
+                  {directShareRoute.active
+                    ? t(lang, 'بازگشت به ورود', 'Back to Login', 'Terug naar inloggen')
+                    : t(lang, 'رزرو مستقیم (پلاک ۱۷۷)', 'Direct Share (Spot 177)', 'Direct delen (Plek 177)')}
+                </span>
+              </button>
+            )}
+            {!previewInviteToken && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDirectShareRoute((prev) => ({ ...prev, active: false }));
+                  setShowHelpGuide((prev) => !prev);
+                }}
                 aria-label={t(
                   lang,
                   'راهنمای کامل و اینفوگرافیک',
@@ -835,7 +884,22 @@ export default function App() {
         </header>
 
         <main className="flex-1 w-full min-w-0 overflow-x-hidden flex items-center justify-center p-4 sm:p-6 lg:p-10">
-          {showHelpGuide && !previewInviteToken ? (
+          {directShareRoute.active && !previewInviteToken ? (
+            <DirectNeighborShareView
+              lang={lang}
+              initialSpotSlug={directShareRoute.spotSlug}
+              initialBuildingSlug={directShareRoute.buildingSlug}
+              onBackToMain={() => {
+                setDirectShareRoute((prev) => ({ ...prev, active: false }));
+                if (typeof window !== 'undefined') {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('spot');
+                  url.searchParams.delete('direct');
+                  window.history.replaceState({}, '', url.pathname + url.search);
+                }
+              }}
+            />
+          ) : showHelpGuide && !previewInviteToken ? (
             <div className="w-full min-w-0 max-w-[1240px] mx-auto">
               <HelpInfographicGuide
                 lang={lang}

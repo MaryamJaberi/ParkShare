@@ -12,6 +12,10 @@ import type {
   BuildingRosterEntry,
   BuildingWhatsAppGroupConfig,
   Community,
+  DirectShareBookingOwnerView,
+  DirectShareBookingPublic,
+  DirectShareFairUse,
+  DirectShareSpotPublic,
   ExtendedParkingRequest,
   FairUsePolicy,
   NeighborOptInSubmission,
@@ -56,6 +60,42 @@ interface SessionInfo {
   communityId?: string;
 }
 
+interface StoredDirectSpot {
+  id: string;
+  slug: string;
+  buildingSlug: string;
+  buildingName: string;
+  bayNumber: string;
+  floorOrZone: string;
+  ownerDisplayName: string;
+  ownerPhone?: string;
+  ownerPinHash?: string;
+  isFree: boolean;
+  availabilityNote: string;
+  active: boolean;
+  fairUse: DirectShareFairUse;
+  createdAt: string;
+}
+
+interface StoredDirectBooking {
+  id: string;
+  spotId: string;
+  buildingSlug: string;
+  startIso: string;
+  endIso: string;
+  status: 'Confirmed' | 'Cancelled';
+  purposeTag: 'visite' | 'temporary' | 'delivery';
+  guestName: string;
+  guestPhone: string;
+  guestPhoneNormalized: string;
+  guestUnit: string;
+  guestUnitNormalized: string;
+  guestPlate?: string;
+  note?: string;
+  cancelCode: string;
+  createdAt: string;
+}
+
 interface ParkShareStore {
   accounts: StoredAccount[];
   communities: Community[];
@@ -70,10 +110,36 @@ interface ParkShareStore {
   extendedRequests: ExtendedParkingRequest[];
   privacyAudits: PrivacyAuditEvent[];
   notifications: NotificationEvent[];
+  directSpots: StoredDirectSpot[];
+  directBookings: StoredDirectBooking[];
 }
 
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.resolve(process.cwd(), 'data'));
 const STORE_PATH = path.resolve(DATA_DIR, 'parkshare-store.json');
+
+const DEFAULT_DIRECT_FAIR_USE: DirectShareFairUse = {
+  maxHoursPerBooking: 24,
+  maxDaysPerMonthPerGuest: 8,
+  maxActiveBookingsPerGuest: 2,
+  minGapHoursBetweenStays: 24,
+};
+
+function createDefaultBoston177Spot(): StoredDirectSpot {
+  return {
+    id: 'direct-boston-177',
+    slug: 'boston-177',
+    buildingSlug: 'boston',
+    buildingName: 'Boston Residence',
+    bayNumber: '177',
+    floorOrZone: 'P1',
+    ownerDisplayName: 'Maryam (Plek 177)',
+    isFree: true,
+    availabilityNote: 'Volledig beschikbaar voor tijdelijk gebruik / visite (gratis voor buren)',
+    active: true,
+    fairUse: { ...DEFAULT_DIRECT_FAIR_USE },
+    createdAt: new Date().toISOString(),
+  };
+}
 
 function createEmptyStore(): ParkShareStore {
   return {
@@ -90,6 +156,8 @@ function createEmptyStore(): ParkShareStore {
     extendedRequests: [],
     privacyAudits: [],
     notifications: [],
+    directSpots: [createDefaultBoston177Spot()],
+    directBookings: [],
   };
 }
 
@@ -105,7 +173,16 @@ function loadStore(): ParkShareStore {
     }
     const raw = fs.readFileSync(STORE_PATH, 'utf8');
     const parsed = JSON.parse(raw) as Partial<ParkShareStore>;
-    return { ...createEmptyStore(), ...parsed };
+    const merged: ParkShareStore = { ...createEmptyStore(), ...parsed };
+    if (!Array.isArray(merged.directSpots) || merged.directSpots.length === 0) {
+      merged.directSpots = [createDefaultBoston177Spot()];
+    } else if (!merged.directSpots.some((s) => s.slug === 'boston-177')) {
+      merged.directSpots.unshift(createDefaultBoston177Spot());
+    }
+    if (!Array.isArray(merged.directBookings)) {
+      merged.directBookings = [];
+    }
+    return merged;
   } catch {
     return createEmptyStore();
   }
@@ -2233,6 +2310,530 @@ async function startServer() {
       reply,
       state: buildScopedStateForSession(session),
     });
+  });
+
+  // ============================================================================
+  // Direct Neighbor Share (Managerless Peer-to-Peer Community Sharing)
+  // ============================================================================
+  const toPublicDirectSpot = (s: StoredDirectSpot): DirectShareSpotPublic => ({
+    id: s.id,
+    slug: s.slug,
+    buildingSlug: s.buildingSlug,
+    buildingName: s.buildingName,
+    bayNumber: s.bayNumber,
+    floorOrZone: s.floorOrZone,
+    ownerDisplayName: s.ownerDisplayName,
+    hasOwnerWhatsApp: Boolean(s.ownerPhone),
+    ownerPinClaimed: Boolean(s.ownerPinHash),
+    isFree: s.isFree,
+    availabilityNote: s.availabilityNote,
+    active: s.active,
+    fairUse: s.fairUse,
+    createdAt: s.createdAt,
+  });
+
+  const toPublicDirectBooking = (b: StoredDirectBooking): DirectShareBookingPublic => ({
+    id: b.id,
+    spotId: b.spotId,
+    startIso: b.startIso,
+    endIso: b.endIso,
+    status: b.status,
+    purposeTag: b.purposeTag,
+    createdAt: b.createdAt,
+  });
+
+  const toOwnerDirectBooking = (b: StoredDirectBooking): DirectShareBookingOwnerView => ({
+    ...toPublicDirectBooking(b),
+    guestName: b.guestName,
+    guestPhone: b.guestPhone,
+    guestUnit: b.guestUnit,
+    guestPlate: b.guestPlate,
+    note: b.note,
+  });
+
+  const slugifyText = (raw: string): string =>
+    raw
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48);
+
+  const normalizeDirectPhone = (phone: string): string => {
+    const digits = phone.replace(/[^\d]/g, '');
+    return digits.length >= 9 ? digits.slice(-9) : digits;
+  };
+
+  // D1. Public: List Direct Neighbor Spots + Anonymized Bookings (Zero PII)
+  app.get('/api/direct/spots', (req, res) => {
+    const buildingFilter = String(req.query.building ?? '').trim().toLowerCase();
+    const spotFilter = String(req.query.spot ?? '').trim().toLowerCase();
+
+    let spots = store.directSpots;
+    if (buildingFilter) {
+      spots = spots.filter((s) => s.buildingSlug === buildingFilter);
+    }
+    if (spotFilter) {
+      const exact = store.directSpots.find((s) => s.slug === spotFilter);
+      if (exact && !buildingFilter) {
+        spots = store.directSpots.filter((s) => s.buildingSlug === exact.buildingSlug);
+      }
+    }
+
+    const spotIds = new Set(spots.map((s) => s.id));
+    const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
+    const bookings = store.directBookings
+      .filter((b) => spotIds.has(b.spotId) && b.status === 'Confirmed' && Date.parse(b.endIso) >= cutoffMs)
+      .sort((a, b) => Date.parse(a.startIso) - Date.parse(b.startIso))
+      .map(toPublicDirectBooking);
+
+    res.json({
+      spots: spots.map(toPublicDirectSpot),
+      bookings,
+    });
+  });
+
+  // D2. Public: Any Neighbor Can Add Their Own Spot to Share (No Manager Needed!)
+  app.post('/api/direct/spots', (req, res) => {
+    const {
+      buildingName,
+      bayNumber,
+      floorOrZone,
+      ownerDisplayName,
+      ownerPhone,
+      ownerPin,
+      availabilityNote,
+      maxHoursPerBooking,
+      maxDaysPerMonthPerGuest,
+    } = req.body ?? {};
+
+    const cleanBuilding = String(buildingName ?? 'Boston Residence').trim().slice(0, 60) || 'Boston Residence';
+    const cleanBay = String(bayNumber ?? '').trim().toUpperCase().slice(0, 20);
+    const cleanFloor = String(floorOrZone ?? 'P1').trim().slice(0, 20) || 'P1';
+    const cleanOwner = String(ownerDisplayName ?? '').trim().slice(0, 50);
+    const cleanPin = String(ownerPin ?? '').trim();
+    const cleanNote = String(availabilityNote ?? '').trim().slice(0, 200);
+    const rawPhone = String(ownerPhone ?? '').trim();
+
+    if (!cleanBay || cleanOwner.length < 2) {
+      res.status(400).json({
+        errorNl: 'Vul uw parkeerpleknummer en naam in.',
+        errorEn: 'Please enter your parking bay number and name.',
+        errorFa: 'لطفاً شماره پارکینگ و نام خود را وارد کنید.',
+      });
+      return;
+    }
+
+    if (cleanPin.length < 4) {
+      res.status(400).json({
+        errorNl: 'Kies een pincode van minimaal 4 tekens om reserveringen te beheren.',
+        errorEn: 'Please choose an owner PIN of at least 4 characters to manage bookings.',
+        errorFa: 'لطفاً یک پین حداقل ۴ کاراکتری برای مدیریت رزروهای پارکینگ خود انتخاب کنید.',
+      });
+      return;
+    }
+
+    let safeOwnerPhone: string | undefined;
+    if (rawPhone) {
+      const cleaned = rawPhone.replace(/[\s\-()]/g, '');
+      const digitsOnly = cleaned.replace(/^\+/, '');
+      if (!/^\d{7,15}$/.test(digitsOnly)) {
+        res.status(400).json({
+          errorNl: 'Voer een geldig telefoon-/WhatsApp-nummer in (7–15 cijfers).',
+          errorEn: 'Please enter a valid phone/WhatsApp number (7–15 digits).',
+          errorFa: 'شماره تماس/واتساپ معتبر (۷ تا ۱۵ رقم) وارد کنید.',
+        });
+        return;
+      }
+      safeOwnerPhone = cleaned.startsWith('+') ? cleaned : `+${digitsOnly}`;
+    }
+
+    const buildingSlug = slugifyText(cleanBuilding.split(/\s+/)[0] || cleanBuilding) || 'boston';
+    const baseSlug = `${buildingSlug}-${slugifyText(cleanBay)}`;
+    if (store.directSpots.some((s) => s.slug === baseSlug)) {
+      res.status(409).json({
+        errorNl: `Parkeerplek ${cleanBay} bestaat al in ${cleanBuilding}.`,
+        errorEn: `Parking bay ${cleanBay} already exists in ${cleanBuilding}.`,
+        errorFa: `پارکینگ ${cleanBay} قبلاً در ${cleanBuilding} ثبت شده است.`,
+      });
+      return;
+    }
+
+    const clampedMaxHours = Math.min(72, Math.max(2, Number(maxHoursPerBooking) || 24));
+    const clampedMaxDays = Math.min(15, Math.max(2, Number(maxDaysPerMonthPerGuest) || 8));
+
+    const newSpot: StoredDirectSpot = {
+      id: `direct-${Date.now()}-${crypto.randomBytes(2).toString('hex')}`,
+      slug: baseSlug,
+      buildingSlug,
+      buildingName: cleanBuilding,
+      bayNumber: cleanBay,
+      floorOrZone: cleanFloor,
+      ownerDisplayName: cleanOwner,
+      ownerPhone: safeOwnerPhone,
+      ownerPinHash: hashPassword(cleanPin),
+      isFree: true,
+      availabilityNote: cleanNote || 'Beschikbaar voor tijdelijk gebruik / visite (gratis voor buren)',
+      active: true,
+      fairUse: {
+        maxHoursPerBooking: clampedMaxHours,
+        maxDaysPerMonthPerGuest: clampedMaxDays,
+        maxActiveBookingsPerGuest: 2,
+        minGapHoursBetweenStays: 24,
+      },
+      createdAt: new Date().toISOString(),
+    };
+
+    store.directSpots.push(newSpot);
+    saveStore();
+    res.status(201).json({ spot: toPublicDirectSpot(newSpot) });
+  });
+
+  // D3. One-Time Owner Claim for Pre-Seeded Spot (e.g. Boston 177)
+  app.post('/api/direct/spots/:slug/claim-owner', (req, res) => {
+    const slug = String(req.params.slug ?? '').toLowerCase();
+    const spot = store.directSpots.find((s) => s.slug === slug);
+    if (!spot) {
+      res.status(404).json({ errorEn: 'Spot not found.', errorNl: 'Plek niet gevonden.', errorFa: 'پارکینگ یافت نشد.' });
+      return;
+    }
+    if (spot.ownerPinHash) {
+      res.status(409).json({
+        errorNl: 'Deze parkeerplek is al geclaimd door de eigenaar.',
+        errorEn: 'This spot is already claimed by its owner.',
+        errorFa: 'پین مالک این پارکینگ قبلاً تنظیم شده است.',
+      });
+      return;
+    }
+
+    const { ownerPin, ownerDisplayName, ownerPhone, availabilityNote } = req.body ?? {};
+    const cleanPin = String(ownerPin ?? '').trim();
+    if (cleanPin.length < 4) {
+      res.status(400).json({
+        errorNl: 'Kies een pincode van minimaal 4 tekens.',
+        errorEn: 'PIN must be at least 4 characters.',
+        errorFa: 'پین مالک باید حداقل ۴ کاراکتر باشد.',
+      });
+      return;
+    }
+
+    const rawPhone = String(ownerPhone ?? '').trim();
+    let safeOwnerPhone: string | undefined;
+    if (rawPhone) {
+      const cleaned = rawPhone.replace(/[\s\-()]/g, '');
+      const digitsOnly = cleaned.replace(/^\+/, '');
+      if (!/^\d{7,15}$/.test(digitsOnly)) {
+        res.status(400).json({
+          errorNl: 'Voer een geldig WhatsApp-nummer in (7–15 cijfers).',
+          errorEn: 'Invalid WhatsApp phone number.',
+          errorFa: 'شماره واتساپ معتبر نیست.',
+        });
+        return;
+      }
+      safeOwnerPhone = cleaned.startsWith('+') ? cleaned : `+${digitsOnly}`;
+    }
+
+    spot.ownerPinHash = hashPassword(cleanPin);
+    if (String(ownerDisplayName ?? '').trim().length >= 2) {
+      spot.ownerDisplayName = String(ownerDisplayName).trim().slice(0, 50);
+    }
+    if (safeOwnerPhone) {
+      spot.ownerPhone = safeOwnerPhone;
+    }
+    if (String(availabilityNote ?? '').trim()) {
+      spot.availabilityNote = String(availabilityNote).trim().slice(0, 200);
+    }
+    saveStore();
+    res.json({ ok: true, spot: toPublicDirectSpot(spot) });
+  });
+
+  // D4. Public: Book a Direct Spot (Atomic Conflict Lock + Anti-Permanent Fair-Use + Mandatory Owner-Only Contact)
+  app.post('/api/direct/spots/:slug/book', (req, res) => {
+    const slug = String(req.params.slug ?? '').toLowerCase();
+    const spot = store.directSpots.find((s) => s.slug === slug);
+    if (!spot) {
+      res.status(404).json({ errorNl: 'Parkeerplek niet gevonden.', errorEn: 'Spot not found.', errorFa: 'پارکینگ یافت نشد.' });
+      return;
+    }
+    if (!spot.active) {
+      res.status(409).json({
+        errorNl: 'Deze parkeerplek is momenteel tijdelijk gepauzeerd door de eigenaar.',
+        errorEn: 'This parking spot is currently paused by the owner.',
+        errorFa: 'این پارکینگ موقتاً توسط مالک غیرفعال شده است.',
+      });
+      return;
+    }
+
+    const { startIso, endIso, guestName, guestPhone, guestUnit, guestPlate, purposeTag, note } = req.body ?? {};
+    const startMs = Date.parse(String(startIso ?? ''));
+    const endMs = Date.parse(String(endIso ?? ''));
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+      res.status(400).json({
+        errorNl: 'Kies een geldige begin- en einddatum/tijd.',
+        errorEn: 'Please choose a valid start and end date/time.',
+        errorFa: 'لطفاً تاریخ و ساعت شروع و پایان معتبر انتخاب کنید.',
+      });
+      return;
+    }
+    if (startMs < Date.now() - 15 * 60 * 1000) {
+      res.status(400).json({
+        errorNl: 'De begintijd mag niet in het verleden liggen.',
+        errorEn: 'Start time cannot be in the past.',
+        errorFa: 'زمان شروع نمی‌تواند در گذشته باشد.',
+      });
+      return;
+    }
+
+    const cleanName = String(guestName ?? '').trim().slice(0, 60);
+    const cleanPhoneRaw = String(guestPhone ?? '').trim();
+    const cleanPhoneDigits = cleanPhoneRaw.replace(/[^\d]/g, '');
+    const cleanUnit = String(guestUnit ?? '').trim().slice(0, 30);
+    const cleanPlate = String(guestPlate ?? '').trim().toUpperCase().slice(0, 20);
+    const cleanNote = String(note ?? '').trim().slice(0, 180);
+    const safePurpose: 'visite' | 'temporary' | 'delivery' =
+      purposeTag === 'delivery' ? 'delivery' : purposeTag === 'temporary' ? 'temporary' : 'visite';
+
+    if (cleanName.length < 2 || cleanPhoneDigits.length < 7 || cleanPhoneDigits.length > 15 || cleanUnit.length < 1) {
+      res.status(400).json({
+        errorNl: 'Naam, telefoon-/WhatsApp-nummer en woningnummer zijn verplicht (alleen zichtbaar voor de eigenaar).',
+        errorEn: 'Name, phone/WhatsApp number, and apartment/unit number are required (shared privately with the spot owner only).',
+        errorFa: 'وارد کردن نام، شماره تماس/واتساپ و شماره واحد الزامی است (فقط برای مالک پارکینگ نمایش داده می‌شود).',
+      });
+      return;
+    }
+
+    // 1. Fair-Use Guard #1: Max hours per single stay (default 24h — longer requires owner coordination)
+    const durationHours = (endMs - startMs) / (1000 * 60 * 60);
+    if (durationHours > spot.fairUse.maxHoursPerBooking) {
+      res.status(403).json({
+        code: 'FAIR_USE_MAX_HOURS',
+        errorNl: `Direct boeken kan tot maximaal ${spot.fairUse.maxHoursPerBooking} uur. Langer nodig (bijv. 2 dagen achter elkaar)? Neem dan eerst even contact op met de eigenaar om af te stemmen.`,
+        errorEn: `Instant booking is limited to ${spot.fairUse.maxHoursPerBooking} hours. Need longer (e.g. 2 consecutive days)? Please coordinate directly with the owner first.`,
+        errorFa: `رزرو مستقیم تا حداکثر ${spot.fairUse.maxHoursPerBooking} ساعت مجاز است. اگر بیشتر نیاز دارید (مثلاً ۲ روز پشت سر هم)، لطفاً ابتدا با مالک پارکینگ هماهنگ کنید.`,
+      });
+      return;
+    }
+
+    const normPhone = normalizeDirectPhone(cleanPhoneRaw);
+    const normUnit = cleanUnit.toLowerCase().replace(/\s+/g, '');
+
+    // 2. Atomic Conflict Check on this spot
+    const overlapping = store.directBookings.find(
+      (b) =>
+        b.spotId === spot.id &&
+        b.status === 'Confirmed' &&
+        startMs < Date.parse(b.endIso) &&
+        endMs > Date.parse(b.startIso)
+    );
+    if (overlapping) {
+      res.status(409).json({
+        code: 'CONFLICT_OVERLAP',
+        errorNl: 'Deze plek is op het gekozen tijdstip al gereserveerd. Kies een ander tijdstip of een andere beschikbare plek.',
+        errorEn: 'This spot is already booked during the selected window. Please pick another time or spot.',
+        errorFa: 'این پارکینگ در بازه انتخابی قبلاً رزرو شده است. لطفاً زمان یا جایگاه دیگری انتخاب کنید.',
+      });
+      return;
+    }
+
+    // 3. Fair-Use Guard #2, #3, #4 (per neighbor phone OR apartment unit in the same building)
+    const nowMs = Date.now();
+    const reqMonthKey = new Date(startMs).toISOString().slice(0, 7);
+    const sameGuestBookings = store.directBookings.filter(
+      (b) =>
+        b.buildingSlug === spot.buildingSlug &&
+        b.status === 'Confirmed' &&
+        (b.guestPhoneNormalized === normPhone || b.guestUnitNormalized === normUnit)
+    );
+
+    const activeUpcoming = sameGuestBookings.filter((b) => Date.parse(b.endIso) > nowMs);
+    if (activeUpcoming.length >= spot.fairUse.maxActiveBookingsPerGuest) {
+      res.status(403).json({
+        code: 'FAIR_USE_MAX_ACTIVE',
+        errorNl: `Maximaal ${spot.fairUse.maxActiveBookingsPerGuest} actieve reserveringen tegelijk per bewoner (om eerlijk tijdelijk gebruik te garanderen).`,
+        errorEn: `Maximum ${spot.fairUse.maxActiveBookingsPerGuest} active upcoming bookings at a time per neighbor.`,
+        errorFa: `حداکثر ${spot.fairUse.maxActiveBookingsPerGuest} رزرو فعال هم‌زمان برای هر همسایه مجاز است (برای حفظ عدالت در استفاده موقت).`,
+      });
+      return;
+    }
+
+    const minGapMs = spot.fairUse.minGapHoursBetweenStays * 60 * 60 * 1000;
+    const tooClose = sameGuestBookings.find((b) => {
+      const bStart = Date.parse(b.startIso);
+      const bEnd = Date.parse(b.endIso);
+      const gapAfter = startMs - bEnd;
+      const gapBefore = bStart - endMs;
+      return (gapAfter >= 0 && gapAfter < minGapMs) || (gapBefore >= 0 && gapBefore < minGapMs);
+    });
+    if (tooClose) {
+      res.status(403).json({
+        code: 'FAIR_USE_COOLDOWN',
+        errorNl: `Twee reserveringen direct achter elkaar (binnen ${spot.fairUse.minGapHoursBetweenStays} uur) kunnen niet automatisch — stem dit eerst even af met de eigenaar.`,
+        errorEn: `Back-to-back bookings (within ${spot.fairUse.minGapHoursBetweenStays}h) cannot be booked automatically — please coordinate with the spot owner first.`,
+        errorFa: `رزرو دو بازه پشت سر هم (با فاصله کمتر از ${spot.fairUse.minGapHoursBetweenStays} ساعت) به‌صورت خودکار مجاز نیست — لطفاً برای تمدید با مالک هماهنگ کنید.`,
+      });
+      return;
+    }
+
+    const monthBookings = sameGuestBookings.filter((b) => b.startIso.slice(0, 7) === reqMonthKey);
+    const usedDaysThisMonth = monthBookings.reduce((sum, b) => {
+      const hrs = Math.max(1, (Date.parse(b.endIso) - Date.parse(b.startIso)) / (1000 * 60 * 60));
+      return sum + Math.max(1, Math.ceil(hrs / 24));
+    }, 0);
+    const requestedDays = Math.max(1, Math.ceil(durationHours / 24));
+    if (usedDaysThisMonth + requestedDays > spot.fairUse.maxDaysPerMonthPerGuest) {
+      res.status(403).json({
+        code: 'FAIR_USE_MONTHLY_CAP',
+        errorNl: `Maandlimiet bereikt: maximaal ${spot.fairUse.maxDaysPerMonthPerGuest} dagen per maand per bewoner voor tijdelijk parkeren.`,
+        errorEn: `Monthly fair-use cap reached: maximum ${spot.fairUse.maxDaysPerMonthPerGuest} temporary days per month per neighbor.`,
+        errorFa: `سقف ماهانه استفاده موقت تکمیل شده است (حداکثر ${spot.fairUse.maxDaysPerMonthPerGuest} روز در ماه برای هر همسایه).`,
+      });
+      return;
+    }
+
+    const cancelCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+    const created: StoredDirectBooking = {
+      id: `dbk-${Date.now()}-${crypto.randomBytes(2).toString('hex')}`,
+      spotId: spot.id,
+      buildingSlug: spot.buildingSlug,
+      startIso: new Date(startMs).toISOString(),
+      endIso: new Date(endMs).toISOString(),
+      status: 'Confirmed',
+      purposeTag: safePurpose,
+      guestName: cleanName,
+      guestPhone: cleanPhoneRaw,
+      guestPhoneNormalized: normPhone,
+      guestUnit: cleanUnit,
+      guestUnitNormalized: normUnit,
+      guestPlate: cleanPlate || undefined,
+      note: cleanNote || undefined,
+      cancelCode,
+      createdAt: new Date().toISOString(),
+    };
+
+    store.directBookings.unshift(created);
+    saveStore();
+
+    const ownerWaDigits = spot.ownerPhone ? spot.ownerPhone.replace(/[^\d]/g, '') : '';
+    const waSummary = encodeURIComponent(
+      `Hoi ${spot.ownerDisplayName}, ik heb zojuist plek ${spot.bayNumber} (${spot.buildingName}) gereserveerd via ParkShare.\n` +
+        `Naam: ${cleanName} (Woning ${cleanUnit})\n` +
+        `Tel: ${cleanPhoneRaw}\n` +
+        `Van: ${new Date(startMs).toLocaleString('nl-NL')}\n` +
+        `Tot: ${new Date(endMs).toLocaleString('nl-NL')}` +
+        (cleanNote ? `\nNotitie: ${cleanNote}` : '')
+    );
+
+    res.status(201).json({
+      ok: true,
+      booking: toPublicDirectBooking(created),
+      cancelCode,
+      ownerWhatsAppUrl: ownerWaDigits ? `https://wa.me/${ownerWaDigits}?text=${waSummary}` : null,
+    });
+  });
+
+  // D5. Owner-Only: Unlock & View Full Guest Contact Details for Their Spot
+  app.post('/api/direct/spots/:slug/owner-panel', (req, res) => {
+    const slug = String(req.params.slug ?? '').toLowerCase();
+    const spot = store.directSpots.find((s) => s.slug === slug);
+    if (!spot) {
+      res.status(404).json({ errorNl: 'Plek niet gevonden.', errorEn: 'Spot not found.', errorFa: 'پارکینگ یافت نشد.' });
+      return;
+    }
+    if (!spot.ownerPinHash) {
+      res.status(403).json({
+        needsClaim: true,
+        errorNl: 'Stel eerst uw eigenaar-pincode in.',
+        errorEn: 'Please claim this spot and set your owner PIN first.',
+        errorFa: 'ابتدا پین مالک این پارکینگ را تنظیم کنید.',
+      });
+      return;
+    }
+
+    const pin = String(req.body?.ownerPin ?? '').trim();
+    if (!verifyPassword(pin, spot.ownerPinHash)) {
+      res.status(401).json({
+        errorNl: 'Onjuiste pincode.',
+        errorEn: 'Incorrect owner PIN.',
+        errorFa: 'پین مالک اشتباه است.',
+      });
+      return;
+    }
+
+    const bookings = store.directBookings
+      .filter((b) => b.spotId === spot.id)
+      .sort((a, b) => Date.parse(b.startIso) - Date.parse(a.startIso))
+      .map(toOwnerDirectBooking);
+
+    res.json({
+      spot: { ...toPublicDirectSpot(spot), ownerPhone: spot.ownerPhone || '' },
+      bookings,
+    });
+  });
+
+  // D6. Owner-Only: Update Spot Status / Fair-Use / Availability Note / WhatsApp Number
+  app.patch('/api/direct/spots/:slug/owner-settings', (req, res) => {
+    const slug = String(req.params.slug ?? '').toLowerCase();
+    const spot = store.directSpots.find((s) => s.slug === slug);
+    if (!spot || !spot.ownerPinHash) {
+      res.status(404).json({ errorEn: 'Spot not found or unclaimed.' });
+      return;
+    }
+    const pin = String(req.body?.ownerPin ?? '').trim();
+    if (!verifyPassword(pin, spot.ownerPinHash)) {
+      res.status(401).json({ errorNl: 'Onjuiste pincode.', errorEn: 'Incorrect owner PIN.', errorFa: 'پین اشتباه است.' });
+      return;
+    }
+
+    if (typeof req.body?.active === 'boolean') spot.active = req.body.active;
+    if (typeof req.body?.availabilityNote === 'string') {
+      spot.availabilityNote = req.body.availabilityNote.trim().slice(0, 200);
+    }
+    if (typeof req.body?.ownerPhone === 'string') {
+      const cleaned = req.body.ownerPhone.trim().replace(/[\s\-()]/g, '');
+      const digitsOnly = cleaned.replace(/^\+/, '');
+      if (!cleaned) {
+        spot.ownerPhone = undefined;
+      } else if (/^\d{7,15}$/.test(digitsOnly)) {
+        spot.ownerPhone = cleaned.startsWith('+') ? cleaned : `+${digitsOnly}`;
+      }
+    }
+    if (req.body?.fairUse) {
+      const fu = req.body.fairUse;
+      if (Number.isFinite(Number(fu.maxHoursPerBooking))) {
+        spot.fairUse.maxHoursPerBooking = Math.min(72, Math.max(2, Number(fu.maxHoursPerBooking)));
+      }
+      if (Number.isFinite(Number(fu.maxDaysPerMonthPerGuest))) {
+        spot.fairUse.maxDaysPerMonthPerGuest = Math.min(15, Math.max(2, Number(fu.maxDaysPerMonthPerGuest)));
+      }
+    }
+    saveStore();
+    res.json({ spot: toPublicDirectSpot(spot) });
+  });
+
+  // D7. Cancel Direct Booking (Guest via cancelCode OR Owner via ownerPin)
+  app.post('/api/direct/bookings/:id/cancel', (req, res) => {
+    const booking = store.directBookings.find((b) => b.id === req.params.id);
+    if (!booking) {
+      res.status(404).json({ errorEn: 'Booking not found.' });
+      return;
+    }
+    const spot = store.directSpots.find((s) => s.id === booking.spotId);
+    const cancelCode = String(req.body?.cancelCode ?? '').trim().toUpperCase();
+    const ownerPin = String(req.body?.ownerPin ?? '').trim();
+
+    const validGuest = Boolean(cancelCode && cancelCode === booking.cancelCode);
+    const validOwner = Boolean(ownerPin && spot?.ownerPinHash && verifyPassword(ownerPin, spot.ownerPinHash));
+    if (!validGuest && !validOwner) {
+      res.status(403).json({
+        errorNl: 'Ongeldige annuleringscode of pincode.',
+        errorEn: 'Invalid cancellation code or owner PIN.',
+        errorFa: 'کد لغو یا پین مالک نامعتبر است.',
+      });
+      return;
+    }
+
+    booking.status = 'Cancelled';
+    saveStore();
+    res.json({ ok: true });
   });
 
   // Mount Vite middleware in dev or serve static dist in prod
