@@ -2465,17 +2465,26 @@ async function startServer() {
     }
 
     const buildingSlug = slugifyText(cleanBuilding.split(/\s+/)[0] || cleanBuilding) || 'boston';
-    const baseSlug = `${buildingSlug}-${slugifyText(cleanBay)}`;
+    const mode: 'always' | 'one_time' = availabilityMode === 'one_time' ? 'one_time' : 'always';
+    let baseSlug = `${buildingSlug}-${slugifyText(cleanBay)}`;
     if (store.directSpots.some((s) => s.slug === baseSlug)) {
-      res.status(409).json({
-        errorNl: `Parkeerplek ${cleanBay} bestaat al in ${cleanBuilding}.`,
-        errorEn: `Parking bay ${cleanBay} already exists in ${cleanBuilding}.`,
-        errorFa: `پارکینگ ${cleanBay} قبلاً در ${cleanBuilding} ثبت شده است.`,
-      });
-      return;
+      if (mode === 'one_time') {
+        // Allow multiple one-time date windows for the same bay (e.g. Sat + Tue)
+        let suffix = 2;
+        while (store.directSpots.some((s) => s.slug === `${baseSlug}-${suffix}`)) {
+          suffix += 1;
+        }
+        baseSlug = `${baseSlug}-${suffix}`;
+      } else {
+        res.status(409).json({
+          errorNl: `Parkeerplek ${cleanBay} staat al doorlopend in ${cleanBuilding}. Kies “Eenmalig” voor een extra datum/tijd of pas de bestaande plek aan.`,
+          errorEn: `Parking bay ${cleanBay} is already listed in ${cleanBuilding}. Choose "One-time" for an extra date/time or edit the existing spot.`,
+          errorFa: `پارکینگ ${cleanBay} قبلاً به‌صورت دائمی در ${cleanBuilding} ثبت شده است. برای تاریخ جدید حالت «یک‌باره» را انتخاب کنید یا پارکینگ قبلی را ویرایش کنید.`,
+        });
+        return;
+      }
     }
 
-    const mode: 'always' | 'one_time' = availabilityMode === 'one_time' ? 'one_time' : 'always';
     let safeFromIso: string | undefined;
     let safeUntilIso: string | undefined;
     if (mode === 'one_time') {
