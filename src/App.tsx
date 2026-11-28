@@ -130,24 +130,28 @@ export default function App() {
     return p === '/admin' || params.get('admin') === '1';
   });
 
-  // Direct Neighbor Share route detection (?spot=boston-177 or ?direct=boston) — works without Building Manager!
+  // Direct Neighbor Share is the default landing page on / (unless /admin, ?invite=..., or ?login=1)
   const [directShareRoute, setDirectShareRoute] = useState<{
     active: boolean;
     spotSlug: string | null;
     buildingSlug: string | null;
   }>(() => {
-    if (typeof window === 'undefined') return { active: false, spotSlug: null, buildingSlug: null };
+    if (typeof window === 'undefined') return { active: true, spotSlug: 'boston-177', buildingSlug: 'boston' };
+    const p = window.location.pathname.replace(/\/+$/, '');
     const params = new URLSearchParams(window.location.search);
+    const isAdmin = p === '/admin' || params.get('admin') === '1';
+    const hasInvite = Boolean(params.get('invite'));
+    const wantsLogin = params.get('login') === '1';
+    if (isAdmin || hasInvite || wantsLogin) {
+      return { active: false, spotSlug: null, buildingSlug: null };
+    }
     const spot = params.get('spot');
     const direct = params.get('direct');
-    if (spot || direct) {
-      return {
-        active: true,
-        spotSlug: spot ? spot.trim().toLowerCase() : null,
-        buildingSlug: direct ? direct.trim().toLowerCase() : null,
-      };
-    }
-    return { active: false, spotSlug: null, buildingSlug: null };
+    return {
+      active: true,
+      spotSlug: spot ? spot.trim().toLowerCase() : 'boston-177',
+      buildingSlug: direct ? direct.trim().toLowerCase() : 'boston',
+    };
   });
 
   // Invite token from URL (?invite=...) or when manager previews the neighbor signup link
