@@ -71,6 +71,9 @@ interface StoredDirectSpot {
   ownerPhone?: string;
   ownerPinHash?: string;
   isFree: boolean;
+  availabilityMode?: 'always' | 'one_time';
+  availableFromIso?: string;
+  availableUntilIso?: string;
   availabilityNote: string;
   active: boolean;
   fairUse: DirectShareFairUse;
@@ -2334,6 +2337,9 @@ async function startServer() {
     hasOwnerWhatsApp: Boolean(s.ownerPhone),
     ownerPinClaimed: Boolean(s.ownerPinHash),
     isFree: s.isFree,
+    availabilityMode: s.availabilityMode === 'one_time' ? 'one_time' : 'always',
+    availableFromIso: s.availableFromIso,
+    availableUntilIso: s.availableUntilIso,
     availabilityNote: s.availabilityNote,
     active: s.active,
     fairUse: s.fairUse,
@@ -2409,6 +2415,9 @@ async function startServer() {
       ownerDisplayName,
       ownerPhone,
       ownerPin,
+      availabilityMode,
+      availableFromIso,
+      availableUntilIso,
       availabilityNote,
       maxHoursPerBooking,
       maxDaysPerMonthPerGuest,
@@ -2466,6 +2475,24 @@ async function startServer() {
       return;
     }
 
+    const mode: 'always' | 'one_time' = availabilityMode === 'one_time' ? 'one_time' : 'always';
+    let safeFromIso: string | undefined;
+    let safeUntilIso: string | undefined;
+    if (mode === 'one_time') {
+      const fMs = Date.parse(String(availableFromIso ?? ''));
+      const uMs = Date.parse(String(availableUntilIso ?? ''));
+      if (!Number.isFinite(fMs) || !Number.isFinite(uMs) || uMs <= fMs) {
+        res.status(400).json({
+          errorNl: 'Kies voor een eenmalige aanbieding een geldige begin- en einddatum/tijd.',
+          errorEn: 'For a one-time offer, please choose a valid start and end date/time.',
+          errorFa: 'برای اشتراک‌گذاری یک‌باره، تاریخ و ساعت شروع و پایان معتبر انتخاب کنید.',
+        });
+        return;
+      }
+      safeFromIso = new Date(fMs).toISOString();
+      safeUntilIso = new Date(uMs).toISOString();
+    }
+
     const clampedMaxHours = Math.min(72, Math.max(2, Number(maxHoursPerBooking) || 24));
     const clampedMaxDays = Math.min(15, Math.max(2, Number(maxDaysPerMonthPerGuest) || 8));
 
@@ -2480,7 +2507,14 @@ async function startServer() {
       ownerPhone: safeOwnerPhone,
       ownerPinHash: hashPassword(cleanPin),
       isFree: true,
-      availabilityNote: cleanNote || 'Beschikbaar voor tijdelijk gebruik / visite (gratis voor buren)',
+      availabilityMode: mode,
+      availableFromIso: safeFromIso,
+      availableUntilIso: safeUntilIso,
+      availabilityNote:
+        cleanNote ||
+        (mode === 'one_time'
+          ? 'Eenmalig beschikbaar binnen het aangegeven tijdvak (gratis voor buren)'
+          : 'Doorlopend beschikbaar voor tijdelijk gebruik / visite (gratis voor buren)'),
       active: true,
       fairUse: {
         maxHoursPerBooking: clampedMaxHours,
@@ -2589,6 +2623,21 @@ async function startServer() {
         errorFa: 'زمان شروع نمی‌تواند در گذشته باشد.',
       });
       return;
+    }
+
+    // 0. One-Time Window Enforcement (if owner offered spot only for a specific date/time)
+    if (spot.availabilityMode === 'one_time' && spot.availableFromIso && spot.availableUntilIso) {
+      const winStart = Date.parse(spot.availableFromIso);
+      const winEnd = Date.parse(spot.availableUntilIso);
+      if (startMs < winStart || endMs > winEnd) {
+        res.status(403).json({
+          code: 'OUTSIDE_ONE_TIME_WINDOW',
+          errorNl: 'Deze plek is eenmalig aangeboden voor een specifiek tijdvak. Kies een tijd binnen het aangegeven venster.',
+          errorEn: 'This spot is offered one-time for a specific window. Please choose a time inside the declared window.',
+          errorFa: 'این پارکینگ فقط برای یک بازه زمانی مشخص (یک‌باره) ارائه شده است. لطفاً زمانی داخل همان بازه انتخاب کنید.',
+        });
+        return;
+      }
     }
 
     const cleanName = String(guestName ?? '').trim().slice(0, 60);
@@ -2792,6 +2841,20 @@ async function startServer() {
     }
 
     if (typeof req.body?.active === 'boolean') spot.active = req.body.active;
+    if (req.body?.availabilityMode === 'one_time' || req.body?.availabilityMode === 'always') {
+      spot.availabilityMode = req.body.availabilityMode;
+      if (spot.availabilityMode === 'always') {
+        spot.availableFromIso = undefined;
+        spot.availableUntilIso = undefined;
+      } else {
+        const fMs = Date.parse(String(req.body?.availableFromIso ?? ''));
+        const uMs = Date.parse(String(req.body?.availableUntilIso ?? ''));
+        if (Number.isFinite(fMs) && Number.isFinite(uMs) && uMs > fMs) {
+          spot.availableFromIso = new Date(fMs).toISOString();
+          spot.availableUntilIso = new Date(uMs).toISOString();
+        }
+      }
+    }
     if (typeof req.body?.availabilityNote === 'string') {
       spot.availabilityNote = req.body.availabilityNote.trim().slice(0, 200);
     }
@@ -2815,6 +2878,34 @@ async function startServer() {
     }
     saveStore();
     res.json({ spot: toPublicDirectSpot(spot) });
+  });
+
+  // D6b. Owner-Only: Permanently Delete / Remove Their Spot
+  app.post('/api/direct/spots/:slug/delete', (req, res) => {
+    const slug = String(req.params.slug ?? '').toLowerCase();
+    const spot = store.directSpots.find((s) => s.slug === slug);
+    if (!spot || !spot.ownerPinHash) {
+      res.status(404).json({
+        errorNl: 'Plek niet gevonden of nog niet geclaimd.',
+        errorEn: 'Spot not found or unclaimed.',
+        errorFa: 'پارکینگ یافت نشد.',
+      });
+      return;
+    }
+    const pin = String(req.body?.ownerPin ?? '').trim();
+    if (!verifyPassword(pin, spot.ownerPinHash)) {
+      res.status(401).json({
+        errorNl: 'Onjuiste pincode.',
+        errorEn: 'Incorrect owner PIN.',
+        errorFa: 'پین مالک اشتباه است.',
+      });
+      return;
+    }
+
+    store.directSpots = store.directSpots.filter((s) => s.id !== spot.id);
+    store.directBookings = store.directBookings.filter((b) => b.spotId !== spot.id);
+    saveStore();
+    res.json({ ok: true });
   });
 
   // D7. Cancel Direct Booking (Guest via cancelCode OR Owner via ownerPin)

@@ -759,6 +759,9 @@ export interface DirectShareSpotPublic {
   hasOwnerWhatsApp: boolean;
   ownerPinClaimed: boolean;
   isFree: boolean;
+  availabilityMode: 'always' | 'one_time';
+  availableFromIso?: string;
+  availableUntilIso?: string;
   availabilityNote: string;
   active: boolean;
   fairUse: DirectShareFairUse;

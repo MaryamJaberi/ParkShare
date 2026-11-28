@@ -117,24 +117,32 @@ export const DirectNeighborShareView: React.FC<Props> = ({
   // Add My Spot modal state
   const [showAddSpot, setShowAddSpot] = useState(false);
   const [newBay, setNewBay] = useState('');
-  const [newFloor, setNewFloor] = useState('P1');
+  const [newFloor, setNewFloor] = useState('P5');
   const [newBuilding, setNewBuilding] = useState('Boston Residence');
   const [newOwnerName, setNewOwnerName] = useState('');
   const [newOwnerPhone, setNewOwnerPhone] = useState('');
   const [newOwnerPin, setNewOwnerPin] = useState('');
+  const [newAvailMode, setNewAvailMode] = useState<'one_time' | 'always'>('one_time');
+  const [newAvailFrom, setNewAvailFrom] = useState(defaultStart);
+  const [newAvailUntil, setNewAvailUntil] = useState(defaultEnd);
   const [newAvailNote, setNewAvailNote] = useState('');
   const [newMaxHours, setNewMaxHours] = useState(24);
   const [newMaxDays, setNewMaxDays] = useState(8);
   const [addingSpot, setAddingSpot] = useState(false);
   const [addSpotError, setAddSpotError] = useState<string | null>(null);
 
-  // Owner Private Drawer (Claim PIN / Unlock Guest Contacts)
+  // Owner Private Drawer (Claim PIN / Unlock Guest Contacts / Edit / Delete)
   const [showOwnerPanel, setShowOwnerPanel] = useState(false);
   const [ownerPinInput, setOwnerPinInput] = useState('');
-  const [claimName, setClaimName] = useState('Maryam (Plek 177)');
+  const [claimName, setClaimName] = useState('Maryam (P5 · Plek 177)');
   const [claimPhone, setClaimPhone] = useState('');
   const [ownerLoading, setOwnerLoading] = useState(false);
   const [ownerError, setOwnerError] = useState<string | null>(null);
+  const [confirmDeleteSpot, setConfirmDeleteSpot] = useState(false);
+  const [ownerEditMode, setOwnerEditMode] = useState<'always' | 'one_time'>('always');
+  const [ownerEditFrom, setOwnerEditFrom] = useState(defaultStart);
+  const [ownerEditUntil, setOwnerEditUntil] = useState(defaultEnd);
+  const [ownerSavedMsg, setOwnerSavedMsg] = useState<string | null>(null);
   const [ownerUnlocked, setOwnerUnlocked] = useState<{
     pin: string;
     ownerPhone: string;
@@ -293,6 +301,9 @@ export const DirectNeighborShareView: React.FC<Props> = ({
           ownerDisplayName: newOwnerName,
           ownerPhone: newOwnerPhone,
           ownerPin: newOwnerPin,
+          availabilityMode: newAvailMode,
+          availableFromIso: newAvailMode === 'one_time' ? new Date(newAvailFrom).toISOString() : undefined,
+          availableUntilIso: newAvailMode === 'one_time' ? new Date(newAvailUntil).toISOString() : undefined,
           availabilityNote: newAvailNote,
           maxHoursPerBooking: newMaxHours,
           maxDaysPerMonthPerGuest: newMaxDays,
@@ -389,11 +400,59 @@ export const DirectNeighborShareView: React.FC<Props> = ({
         ownerPhone: data.spot?.ownerPhone || '',
         bookings: data.bookings || [],
       });
+      setOwnerEditMode(data.spot?.availabilityMode === 'one_time' ? 'one_time' : 'always');
+      if (data.spot?.availableFromIso) {
+        setOwnerEditFrom(toLocalDateTimeInputValue(new Date(data.spot.availableFromIso)));
+      }
+      if (data.spot?.availableUntilIso) {
+        setOwnerEditUntil(toLocalDateTimeInputValue(new Date(data.spot.availableUntilIso)));
+      }
+      setConfirmDeleteSpot(false);
+      setOwnerSavedMsg(null);
     } catch {
       setOwnerError(t(lang, 'خطای شبکه.', 'Network error.', 'Netwerkfout.'));
     } finally {
       setOwnerLoading(false);
     }
+  };
+
+  const handleSaveOwnerAvailability = async () => {
+    if (!activeSpot || !ownerUnlocked) return;
+    setOwnerSavedMsg(null);
+    const res = await fetch(`/api/direct/spots/${encodeURIComponent(activeSpot.slug)}/owner-settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ownerPin: ownerUnlocked.pin,
+        availabilityMode: ownerEditMode,
+        availableFromIso: ownerEditMode === 'one_time' ? new Date(ownerEditFrom).toISOString() : undefined,
+        availableUntilIso: ownerEditMode === 'one_time' ? new Date(ownerEditUntil).toISOString() : undefined,
+      }),
+    });
+    if (res.ok) {
+      await loadDirectData();
+      setOwnerSavedMsg(t(lang, 'تنظیمات دسترسی ذخیره شد.', 'Availability updated.', 'Beschikbaarheid opgeslagen.'));
+    }
+  };
+
+  const handleDeleteSpot = async () => {
+    if (!activeSpot || !ownerUnlocked) return;
+    setOwnerError(null);
+    const res = await fetch(`/api/direct/spots/${encodeURIComponent(activeSpot.slug)}/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ownerPin: ownerUnlocked.pin }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setOwnerError(pickLocalizedError(data, lang, 'Delete failed'));
+      return;
+    }
+    setOwnerUnlocked(null);
+    setOwnerPinInput('');
+    setConfirmDeleteSpot(false);
+    setShowOwnerPanel(false);
+    await loadDirectData();
   };
 
   const handleToggleSpotActive = async () => {
@@ -507,7 +566,7 @@ export const DirectNeighborShareView: React.FC<Props> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
             <div className="p-4 rounded-2xl bg-[#F8F6FD] border border-[#E6E0F7] space-y-2">
               <div className="font-extrabold text-[#5A2FA8]">
                 {t(lang, '۱. چطور پارکینگ رزرو کنم؟', '1. How to Reserve a Spot', '1. Hoe reserveer ik een plek?')}
@@ -521,38 +580,48 @@ export const DirectNeighborShareView: React.FC<Props> = ({
 
             <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200/80 space-y-2">
               <div className="font-extrabold text-rose-800">
-                {t(lang, '۲. چطور یک رزرو را لغو (باطل) کنم؟', '2. How to Cancel a Booking', '2. Hoe annuleer ik een reservering?')}
+                {t(lang, '۲. چطور یک رزرو را لغو کنم؟', '2. How to Cancel a Booking', '2. Hoe annuleer ik een reservering?')}
               </div>
               <ul className="space-y-2 text-slate-700 leading-relaxed">
                 <li>
                   <strong className="text-slate-900">{t(lang, 'اگر همسایه رزروکننده هستید:', 'As the guest:', 'Als huurder / buur:')}</strong>{' '}
                   {t(
                     lang,
-                    'در لیست «رزروهای ثبت‌شده» روی «لغو با کد» بزنید، کد ۶ کاراکتری که هنگام رزرو دریافت کردید را وارد و روی «لغو» کلیک کنید. (اگر کد را گم کردید، به مالک پیام دهید.)',
-                    'Click "Cancel with code" on your booking, enter the 6-char code shown when you booked, and click Cancel. (Lost your code? Ask the spot owner.)',
-                    'Klik op "Annuleren met code", vul de 6-tekens code in die u na het boeken kreeg en klik op Annuleer. (Code kwijt? Vraag de eigenaar.)'
+                    'در لیست «رزروهای ثبت‌شده» روی «لغو با کد» بزنید و کد ۶ کاراکتری خود را وارد کنید.',
+                    'Click "Cancel with code" on your booking and enter your 6-char code.',
+                    'Klik op "Annuleren met code" en vul uw 6-tekens code in.'
                   )}
                 </li>
                 <li>
                   <strong className="text-slate-900">{t(lang, 'اگر مالک پارکینگ هستید:', 'As the spot owner:', 'Als eigenaar van de plek:')}</strong>{' '}
                   {t(
                     lang,
-                    'نیازی به کد مهمان ندارید! پایین صفحه بخش «پنل خصوصی مالک» را باز کنید، پین خصوصی خود را بزنید و روی «لغو رزرو توسط مالک» کلیک کنید.',
-                    'No guest code needed! Open "Owner Panel" below, enter your private PIN, and click "Cancel booking (Owner)".',
-                    'Geen gastcode nodig! Open hieronder het "Eigenaar-paneel", voer uw pincode in en klik op "Annuleren (Eigenaar)".'
+                    'دکمه «مدیریت / حذف پارکینگ» را بزنید، پین خود را وارد کنید و بدون نیاز به کد مهمان لغو کنید.',
+                    'Click "Owner: Manage / Delete", enter your PIN, and cancel any booking in 1 click.',
+                    'Klik op "Eigenaar: Beheren / Verwijderen", voer uw pincode in en annuleer met 1 klik.'
                   )}
                 </li>
               </ul>
             </div>
 
+            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-2">
+              <div className="font-extrabold text-amber-900">
+                {t(lang, '۳. اشتراک یک‌باره یا حذف پارکینگ من', '3. One-Time Offer, Pause or Delete Spot', '3. Eenmalig aanbieden, pauzeren of verwijderen')}
+              </div>
+              <ul className="space-y-1.5 text-slate-700 leading-relaxed">
+                <li>{t(lang, '• در «من هم پارکینگم را اضافه می‌کنم» می‌توانید حالت «یک‌باره (تاریخ و ساعت مشخص)» انتخاب کنید تا دائمی نشود.', '• When adding your spot, choose "One-Time (specific date & time)" so it is never shared permanently.', '• Kies bij het toevoegen voor "Eenmalig (specifieke datum & tijd)" zodat uw plek niet structureel open staat.')}</li>
+                <li>{t(lang, '• هر لحظه می‌توانید با پین مالک، پارکینگ را «متوقف»، «ویرایش» یا «کاملاً حذف» کنید.', '• Anytime, open the Owner Panel with your PIN to edit, pause, or permanently delete your spot.', '• Via "Eigenaar: Beheren / Verwijderen" kunt u met uw pincode op elk moment pauzeren, aanpassen of uw plek direct verwijderen.')}</li>
+              </ul>
+            </div>
+
             <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-2">
               <div className="font-extrabold text-emerald-900">
-                {t(lang, '۳. قوانین عادلانه و افزودن پارکینگ دیگران', '3. Fair-Use Rules & Adding Your Spot', '3. Spelregels & Eigen plek toevoegen')}
+                {t(lang, '۴. قوانین عادلانه (ضد استفاده دائمی)', '4. Fair-Use Rules (Anti-Permanent)', '4. Spelregels (Geen vast gebruik)')}
               </div>
               <ul className="space-y-1.5 text-slate-700 leading-relaxed">
                 <li>{t(lang, '• حداکثر ۲۴ ساعت در هر رزرو مستقیم.', '• Max 24 hours per instant booking.', '• Max. 24 uur per directe reservering.')}</li>
                 <li>{t(lang, '• برای ۲ روز پشت سر هم (فاصله کمتر از ۲۴ ساعت) ابتدا با مالک هماهنگ کنید.', '• Need 2 consecutive days? Coordinate with the owner first (24h gap rule).', '• 2 dagen achter elkaar nodig? Stem dit eerst af met de eigenaar (24u pauze).')}</li>
-                <li>{t(lang, '• همسایه‌های دیگر هم با دکمه «من هم پارکینگم را اضافه می‌کنم» می‌توانند جای پارکشان را اضافه کنند.', '• Other neighbors can click "Share My Spot Too" to add their own bay.', '• Andere buren kunnen via "Mijn plek ook delen" ook hun eigen plek toevoegen.')}</li>
+                <li>{t(lang, '• حداکثر ۸ روز در ماه برای هر همسایه.', '• Max 8 temporary days per month per neighbor.', '• Max. 8 dagen per maand per bewoner.')}</li>
               </ul>
             </div>
           </div>
@@ -593,6 +662,19 @@ export const DirectNeighborShareView: React.FC<Props> = ({
               <p className="text-xs sm:text-sm text-white/90 leading-relaxed">
                 {activeSpot.availabilityNote}
               </p>
+
+              {activeSpot.availabilityMode === 'one_time' &&
+                activeSpot.availableFromIso &&
+                activeSpot.availableUntilIso && (
+                  <div className="inline-flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-300/20 border border-amber-200/40 text-amber-100 text-xs font-bold">
+                    <CalendarClock className="w-3.5 h-3.5" />
+                    <span>
+                      {t(lang, 'فقط یک‌باره:', 'One-time window:', 'Eenmalig beschikbaar:')}{' '}
+                      {formatDateTime(activeSpot.availableFromIso, lang)} →{' '}
+                      {formatDateTime(activeSpot.availableUntilIso, lang)}
+                    </span>
+                  </div>
+                )}
 
               <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-white/90">
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/10">
@@ -645,6 +727,19 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                 {copiedMode === 'link'
                   ? t(lang, 'لینک کپی شد!', 'Link Copied!', 'Link gekopieerd!')
                   : t(lang, 'کپی لینک مستقیم', 'Copy Direct Link', 'Kopieer directe link')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOwnerPanel(true);
+                  setTimeout(() => {
+                    document.getElementById('direct-owner-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 50);
+                }}
+                className="min-h-[42px] px-4 py-2 rounded-2xl bg-white text-[#5A2FA8] hover:bg-[#F5F1FD] text-xs font-bold inline-flex items-center gap-2 transition-colors"
+              >
+                <KeyRound className="w-4 h-4" />
+                {t(lang, 'مالک: ویرایش / حذف', 'Owner: Edit / Delete', 'Eigenaar: Beheren / Verwijderen')}
               </button>
             </div>
           </div>
@@ -1053,8 +1148,8 @@ export const DirectNeighborShareView: React.FC<Props> = ({
               )}
             </div>
 
-            {/* Owner Private Panel (PIN Claim / View Guest Contact Info) */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 ps-card-shadow space-y-4">
+            {/* Owner Private Panel (PIN Claim / View Guest Contact Info / Edit / Delete) */}
+            <div id="direct-owner-panel" className="bg-white border border-slate-200 rounded-3xl p-5 ps-card-shadow space-y-4">
               <button
                 type="button"
                 onClick={() => setShowOwnerPanel((v) => !v)}
@@ -1151,24 +1246,110 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                     </form>
                   ) : (
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-xs font-bold text-emerald-700">
                           {t(lang, 'پنل مالک باز شد', 'Owner Unlocked', 'Eigenaar ontgrendeld')}
                         </span>
-                        <button
-                          type="button"
-                          onClick={handleToggleSpotActive}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${
-                            activeSpot.active
-                              ? 'bg-amber-50 border-amber-200 text-amber-800'
-                              : 'bg-emerald-600 border-emerald-600 text-white'
-                          }`}
-                        >
-                          {activeSpot.active ? <PauseCircle className="w-3.5 h-3.5" /> : <PlayCircle className="w-3.5 h-3.5" />}
-                          {activeSpot.active
-                            ? t(lang, 'توقف موقت پارکینگ', 'Pause Spot', 'Plek pauzeren')
-                            : t(lang, 'فعال‌سازی مجدد', 'Resume Spot', 'Plek activeren')}
-                        </button>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handleToggleSpotActive}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                              activeSpot.active
+                                ? 'bg-amber-50 border-amber-200 text-amber-800'
+                                : 'bg-emerald-600 border-emerald-600 text-white'
+                            }`}
+                          >
+                            {activeSpot.active ? <PauseCircle className="w-3.5 h-3.5" /> : <PlayCircle className="w-3.5 h-3.5" />}
+                            {activeSpot.active
+                              ? t(lang, 'توقف موقت', 'Pause Spot', 'Pauzeren')
+                              : t(lang, 'فعال‌سازی', 'Resume Spot', 'Activeren')}
+                          </button>
+                          {!confirmDeleteSpot ? (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteSpot(true)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              {t(lang, 'حذف پارکینگ', 'Delete Spot', 'Plek verwijderen')}
+                            </button>
+                          ) : (
+                            <div className="inline-flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={handleDeleteSpot}
+                                className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white"
+                              >
+                                {t(lang, 'تأیید حذف', 'Confirm Delete', 'Bevestig verwijderen')}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteSpot(false)}
+                                className="px-2 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700"
+                              >
+                                {t(lang, 'انصراف', 'Cancel', 'Annuleer')}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Owner Availability Mode Switcher (One-time vs Always) */}
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
+                        <div className="font-bold text-slate-800">
+                          {t(lang, 'نوع دسترس‌پذیری پارکینگ:', 'Spot availability mode:', 'Beschikbaarheid aanpassen:')}
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setOwnerEditMode('one_time')}
+                            className={`py-1.5 px-2.5 rounded-xl font-bold border ${
+                              ownerEditMode === 'one_time'
+                                ? 'bg-[#6E41C4] text-white border-[#6E41C4]'
+                                : 'bg-white text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {t(lang, 'فقط یک‌باره (بازه مشخص)', 'One-time window', 'Eenmalig (datum/tijd)')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOwnerEditMode('always')}
+                            className={`py-1.5 px-2.5 rounded-xl font-bold border ${
+                              ownerEditMode === 'always'
+                                ? 'bg-[#6E41C4] text-white border-[#6E41C4]'
+                                : 'bg-white text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {t(lang, 'همیشه آزاد (موقت)', 'Always open', 'Doorlopend vrij')}
+                          </button>
+                        </div>
+                        {ownerEditMode === 'one_time' && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                              type="datetime-local"
+                              value={ownerEditFrom}
+                              onChange={(e) => setOwnerEditFrom(e.target.value)}
+                              className="h-9 px-2 bg-white border border-slate-200 rounded-lg text-[11px]"
+                            />
+                            <input
+                              type="datetime-local"
+                              value={ownerEditUntil}
+                              onChange={(e) => setOwnerEditUntil(e.target.value)}
+                              className="h-9 px-2 bg-white border border-slate-200 rounded-lg text-[11px]"
+                            />
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={handleSaveOwnerAvailability}
+                            className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-[11px] font-bold"
+                          >
+                            {t(lang, 'ذخیره زمان‌بندی', 'Save Availability', 'Opslaan')}
+                          </button>
+                          {ownerSavedMsg && <span className="text-[11px] font-semibold text-emerald-700">{ownerSavedMsg}</span>}
+                        </div>
                       </div>
 
                       {ownerUnlocked.bookings.length === 0 ? (
@@ -1325,9 +1506,64 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                 </label>
               </div>
 
+              {/* One-Time vs Structural Choice (Prevents accidental permanent sharing!) */}
+              <div className="p-3.5 rounded-2xl bg-[#F8F6FD] border border-[#E6E0F7] space-y-2.5">
+                <div className="font-bold text-slate-900">
+                  {t(lang, 'چگونه می‌خواهید پارکینگتان را به اشتراک بگذارید؟', 'How do you want to share your spot?', 'Hoe wilt u uw plek aanbieden?')}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewAvailMode('one_time')}
+                    className={`py-2 px-3 rounded-xl font-bold border text-center ${
+                      newAvailMode === 'one_time'
+                        ? 'bg-[#6E41C4] text-white border-[#6E41C4]'
+                        : 'bg-white text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {t(lang, 'یک‌باره (تاریخ و ساعت مشخص)', 'One-time (specific date)', 'Eenmalig (specifieke datum)')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewAvailMode('always')}
+                    className={`py-2 px-3 rounded-xl font-bold border text-center ${
+                      newAvailMode === 'always'
+                        ? 'bg-[#6E41C4] text-white border-[#6E41C4]'
+                        : 'bg-white text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {t(lang, 'همیشه آزاد (موقت)', 'Always open (temporary)', 'Doorlopend beschikbaar')}
+                  </button>
+                </div>
+                {newAvailMode === 'one_time' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <label className="space-y-1 block">
+                      <span className="font-semibold text-slate-700">{t(lang, 'آزاد از:', 'Available from:', 'Vrij vanaf:')}</span>
+                      <input
+                        type="datetime-local"
+                        required
+                        value={newAvailFrom}
+                        onChange={(e) => setNewAvailFrom(e.target.value)}
+                        className="w-full h-10 px-2.5 bg-white border border-slate-200 rounded-xl"
+                      />
+                    </label>
+                    <label className="space-y-1 block">
+                      <span className="font-semibold text-slate-700">{t(lang, 'آزاد تا:', 'Available until:', 'Vrij tot:')}</span>
+                      <input
+                        type="datetime-local"
+                        required
+                        value={newAvailUntil}
+                        onChange={(e) => setNewAvailUntil(e.target.value)}
+                        className="w-full h-10 px-2.5 bg-white border border-slate-200 rounded-xl"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
               <label className="space-y-1 block">
                 <span className="font-semibold text-slate-700">
-                  {t(lang, 'پین خصوصی مدیریت (حداقل ۴ کاراکتر) *', 'Private Owner PIN (min 4 chars) *', 'Eigenaar-pincode (min. 4 tekens) *')}
+                  {t(lang, 'پین خصوصی مدیریت (حداقل ۴ کاراکتر — برای ویرایش/حذف) *', 'Private Owner PIN (min 4 chars — to edit/delete) *', 'Eigenaar-pincode (min. 4 tekens — voor aanpassen/verwijderen) *')}
                 </span>
                 <input
                   type="password"
