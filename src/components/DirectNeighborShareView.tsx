@@ -1662,7 +1662,7 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                     required
                     value={newBay}
                     onChange={(e) => setNewBay(e.target.value)}
-                    placeholder="bijv. 204 of 204, 205"
+                    placeholder="bijv. 204, 205"
                     className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl"
                   />
                   <span className="text-[10px] text-slate-500 block">

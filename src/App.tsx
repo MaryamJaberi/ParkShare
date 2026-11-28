@@ -865,13 +865,13 @@ export default function App() {
                 </span>
               </button>
             )}
-            <div className="inline-flex items-center gap-1.5 px-2.5 min-h-[38px] bg-[#F2EFFA] border border-[#E4DEF4] rounded-xl shrink-0">
+            <div className="inline-flex items-center gap-1 px-2 min-h-[38px] bg-[#F2EFFA] border border-[#E4DEF4] rounded-xl shrink-0">
               <Globe2 className="w-3.5 h-3.5 text-[#5A2FA8] shrink-0" />
               <select
                 aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
                 value={lang}
                 onChange={(e) => setLang(e.target.value as Language)}
-                className="bg-transparent text-xs font-semibold text-[#5A2FA8] focus:outline-none cursor-pointer py-1"
+                className="bg-transparent text-xs font-semibold text-[#5A2FA8] focus:outline-none cursor-pointer py-1 max-w-[68px] sm:max-w-none"
               >
                 {SUPPORTED_LANGUAGES.map((item) => (
                   <option key={item.code} value={item.code} className="text-slate-900 bg-white">
