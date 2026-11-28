@@ -1,4 +1,4 @@
-export type Language = 'nl' | 'en' | 'fa';
+export type Language = 'nl' | 'en' | 'fa' | 'ar' | 'tr' | 'es';
 
 export type ResourceType = 'parking' | 'boat_berth' | 'storage' | 'commercial';
 

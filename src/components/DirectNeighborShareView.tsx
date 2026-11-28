@@ -42,7 +42,18 @@ function toLocalDateTimeInputValue(date: Date): string {
 function formatDateTime(iso: string, lang: Language): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  const locale = lang === 'fa' ? 'fa-IR' : lang === 'nl' ? 'nl-NL' : 'en-GB';
+  const locale =
+    lang === 'fa'
+      ? 'fa-IR'
+      : lang === 'ar'
+        ? 'ar-EG'
+        : lang === 'tr'
+          ? 'tr-TR'
+          : lang === 'es'
+            ? 'es-ES'
+            : lang === 'nl'
+              ? 'nl-NL'
+              : 'en-GB';
   return d.toLocaleString(locale, {
     weekday: 'short',
     day: 'numeric',
@@ -533,7 +544,7 @@ export const DirectNeighborShareView: React.FC<Props> = ({
           onClick={onBackToMain}
           className="inline-flex items-center gap-2 min-h-[40px] px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
         >
-          <ArrowLeft className={`w-4 h-4 ${lang === 'fa' ? 'rotate-180' : ''}`} />
+          <ArrowLeft className={`w-4 h-4 ${lang === 'fa' || lang === 'ar' ? 'rotate-180' : ''}`} />
           {t(lang, 'ورود مدیر / سامانه ساختمان', 'Building Manager Portal', 'Gebouwbeheerder portaal')}
         </button>
 

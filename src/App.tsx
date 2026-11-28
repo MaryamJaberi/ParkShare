@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarClock,
   Car,
+  Globe2,
   HelpCircle,
   LayoutDashboard,
   LogOut,
@@ -36,7 +37,7 @@ import {
   UserProfile,
 } from './types/parkshare';
 import { createAtomicBooking } from './engines/coreEngine';
-import { t } from './i18n/translations';
+import { isRtlLanguage, SUPPORTED_LANGUAGES, t } from './i18n/translations';
 import { pseudonymizeUser } from './utils/privacy';
 import { AuthAccount, AuthView } from './components/AuthView';
 import { ResidentAppView } from './components/ResidentAppView';
@@ -178,7 +179,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.lang = lang;
-    document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
+    document.documentElement.dir = isRtlLanguage(lang) ? 'rtl' : 'ltr';
   }, [lang]);
 
   // Check initial bootstrap status on mount
@@ -864,25 +865,20 @@ export default function App() {
                 </span>
               </button>
             )}
-            <div
-              role="group"
-              aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
-              className="inline-flex items-center p-0.5 bg-[#F2EFFA] border border-[#E4DEF4] rounded-xl shrink-0"
-            >
-              {(['nl', 'en', 'fa'] as const).map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setLang(code)}
-                  className={`min-h-[34px] px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
-                    lang === code
-                      ? 'bg-white text-[#5A2FA8] shadow-xs'
-                      : 'text-[#6B6780] hover:text-[#171525]'
-                  }`}
-                >
-                  {code === 'nl' ? 'NL' : code === 'en' ? 'EN' : 'فارسی'}
-                </button>
-              ))}
+            <div className="inline-flex items-center gap-1.5 px-2.5 min-h-[38px] bg-[#F2EFFA] border border-[#E4DEF4] rounded-xl shrink-0">
+              <Globe2 className="w-3.5 h-3.5 text-[#5A2FA8] shrink-0" />
+              <select
+                aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
+                value={lang}
+                onChange={(e) => setLang(e.target.value as Language)}
+                className="bg-transparent text-xs font-semibold text-[#5A2FA8] focus:outline-none cursor-pointer py-1"
+              >
+                {SUPPORTED_LANGUAGES.map((item) => (
+                  <option key={item.code} value={item.code} className="text-slate-900 bg-white">
+                    {item.short} · {item.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </header>
@@ -1219,21 +1215,21 @@ export default function App() {
                 aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
                 className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl"
               >
-                {(['nl', 'en', 'fa'] as const).map((code) => (
+                {SUPPORTED_LANGUAGES.map((item) => (
                   <button
-                    key={code}
+                    key={item.code}
                     type="button"
                     onClick={() => {
-                      setLang(code);
+                      setLang(item.code);
                       setMobileNavOpen(false);
                     }}
-                    className={`min-h-[40px] text-xs font-medium rounded-lg transition-colors ${
-                      lang === code
+                    className={`min-h-[38px] text-xs font-medium rounded-lg transition-colors ${
+                      lang === item.code
                         ? 'bg-white text-slate-900 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    {code === 'nl' ? 'Nederlands' : code === 'en' ? 'English' : 'فارسی'}
+                    {item.label}
                   </button>
                 ))}
               </div>
@@ -1292,25 +1288,20 @@ export default function App() {
               </span>
             </button>
 
-            <div
-              role="group"
-              aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
-              className="inline-flex items-center p-0.5 bg-[#F2EFFA] border border-[#E4DEF4] rounded-xl"
-            >
-              {(['nl', 'en', 'fa'] as const).map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setLang(code)}
-                  className={`min-h-[34px] px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
-                    lang === code
-                      ? 'bg-white text-[#5A2FA8] shadow-xs'
-                      : 'text-[#6B6780] hover:text-[#171525]'
-                  }`}
-                >
-                  {code === 'nl' ? 'NL' : code === 'en' ? 'EN' : 'فارسی'}
-                </button>
-              ))}
+            <div className="inline-flex items-center gap-1.5 px-2.5 min-h-[38px] bg-[#F2EFFA] border border-[#E4DEF4] rounded-xl">
+              <Globe2 className="w-3.5 h-3.5 text-[#5A2FA8] shrink-0" />
+              <select
+                aria-label={t(lang, 'انتخاب زبان', 'Language selector', 'Taalkeuze')}
+                value={lang}
+                onChange={(e) => setLang(e.target.value as Language)}
+                className="bg-transparent text-xs font-semibold text-[#5A2FA8] focus:outline-none cursor-pointer py-1"
+              >
+                {SUPPORTED_LANGUAGES.map((item) => (
+                  <option key={item.code} value={item.code} className="text-slate-900 bg-white">
+                    {item.short} · {item.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Mobile Account / Sign-out Sheet Trigger */}
