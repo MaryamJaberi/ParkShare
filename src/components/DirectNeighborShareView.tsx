@@ -101,10 +101,21 @@ export const DirectNeighborShareView: React.FC<Props> = ({
   const [startLocal, setStartLocal] = useState(defaultStart);
   const [endLocal, setEndLocal] = useState(defaultEnd);
   const [purposeTag, setPurposeTag] = useState<'visite' | 'temporary' | 'delivery'>('visite');
-  const [guestName, setGuestName] = useState('');
-  const [guestPhone, setGuestPhone] = useState('');
-  const [guestUnit, setGuestUnit] = useState('');
-  const [guestPlate, setGuestPlate] = useState('');
+  const [guestName, setGuestName] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('parkshare_guest_v1') || '{}').name || ''; } catch { return ''; }
+  });
+  const [guestPhone, setGuestPhone] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('parkshare_guest_v1') || '{}').phone || ''; } catch { return ''; }
+  });
+  const [guestUnit, setGuestUnit] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('parkshare_guest_v1') || '{}').unit || ''; } catch { return ''; }
+  });
+  const [guestPlate, setGuestPlate] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('parkshare_guest_v1') || '{}').plate || ''; } catch { return ''; }
+  });
+  const [savedCancelCodes, setSavedCancelCodes] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('parkshare_cancel_codes_v1') || '{}'); } catch { return {}; }
+  });
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [bookError, setBookError] = useState<string | null>(null);
@@ -225,6 +236,78 @@ export const DirectNeighborShareView: React.FC<Props> = ({
     [bookings, activeSpot]
   );
 
+  // Instant client-side availability & duration check (gives live feedback before submitting!)
+  const liveTimeCheck = useMemo(() => {
+    if (!activeSpot) return null;
+    const sMs = Date.parse(startLocal);
+    const eMs = Date.parse(endLocal);
+    if (!Number.isFinite(sMs) || !Number.isFinite(eMs) || eMs <= sMs) {
+      return {
+        ok: false,
+        durationText: '',
+        message: t(lang, 'ساعت پایان باید بعد از شروع باشد.', 'End time must be after start time.', 'Eindtijd moet na de begintijd liggen.'),
+      };
+    }
+    const hrs = Math.round(((eMs - sMs) / 3600e3) * 10) / 10;
+    const durationText = lang === 'fa' ? `${hrs} ساعت` : lang === 'nl' ? `${hrs}u` : `${hrs}h`;
+
+    if (
+      activeSpot.availabilityMode === 'one_time' &&
+      activeSpot.availableFromIso &&
+      activeSpot.availableUntilIso
+    ) {
+      const wStart = Date.parse(activeSpot.availableFromIso);
+      const wEnd = Date.parse(activeSpot.availableUntilIso);
+      if (sMs < wStart || eMs > wEnd) {
+        return {
+          ok: false,
+          durationText,
+          message: t(
+            lang,
+            'زمان انتخابی خارج از بازه یک‌باره این پارکینگ است.',
+            'Selected time is outside this spot’s one-time window.',
+            'Gekozen tijd valt buiten het eenmalige tijdvak van deze plek.'
+          ),
+        };
+      }
+    }
+
+    if (hrs > activeSpot.fairUse.maxHoursPerBooking) {
+      return {
+        ok: false,
+        durationText,
+        message: t(
+          lang,
+          `بیش از سقف ${activeSpot.fairUse.maxHoursPerBooking} ساعت است — برای مدت بیشتر با مالک هماهنگ کنید.`,
+          `Exceeds ${activeSpot.fairUse.maxHoursPerBooking}h instant limit — coordinate with owner for longer stays.`,
+          `Langer dan ${activeSpot.fairUse.maxHoursPerBooking}u — stem dit eerst even af met de eigenaar.`
+        ),
+      };
+    }
+
+    const hasConflict = activeSpotBookings.some(
+      (b) => sMs < Date.parse(b.endIso) && eMs > Date.parse(b.startIso)
+    );
+    if (hasConflict) {
+      return {
+        ok: false,
+        durationText,
+        message: t(
+          lang,
+          'این بازه با یک رزرو دیگر تداخل دارد.',
+          'Overlaps with an existing booking on this spot.',
+          'Overlapt met een bestaande reservering op deze plek.'
+        ),
+      };
+    }
+
+    return {
+      ok: true,
+      durationText,
+      message: t(lang, 'این بازه آزاد و آماده رزرو است', 'Available for instant booking', 'Vrij en direct te reserveren'),
+    };
+  }, [activeSpot, activeSpotBookings, startLocal, endLocal, lang]);
+
   const shareUrl = useMemo(() => {
     if (typeof window === 'undefined' || !activeSpot) return '';
     return `${window.location.origin}/?spot=${encodeURIComponent(activeSpot.slug)}`;
@@ -300,6 +383,20 @@ export const DirectNeighborShareView: React.FC<Props> = ({
         cancelCode: data.cancelCode,
         ownerWhatsAppUrl: data.ownerWhatsAppUrl ?? null,
       });
+      // Save guest details & cancel code locally in their own browser for 1-tap future bookings/cancellations
+      try {
+        localStorage.setItem(
+          'parkshare_guest_v1',
+          JSON.stringify({ name: guestName, phone: guestPhone, unit: guestUnit, plate: guestPlate })
+        );
+        if (data.booking?.id && data.cancelCode) {
+          const nextCodes = { ...savedCancelCodes, [data.booking.id]: data.cancelCode };
+          setSavedCancelCodes(nextCodes);
+          localStorage.setItem('parkshare_cancel_codes_v1', JSON.stringify(nextCodes));
+        }
+      } catch {
+        // Ignore storage errors in private browsing
+      }
       setNote('');
       await loadDirectData();
     } catch {
@@ -366,6 +463,8 @@ export const DirectNeighborShareView: React.FC<Props> = ({
       setNewOwnerPhone('');
       setNewOwnerPin('');
       setNewAvailNote('');
+      setNewAvailFrom(defaultStart);
+      setNewAvailUntil(defaultEnd);
       await loadDirectData();
       if (lastSlug) {
         setSelectedSlug(lastSlug);
@@ -793,6 +892,13 @@ export const DirectNeighborShareView: React.FC<Props> = ({
         </span>
         {spots.map((s) => {
           const isSelected = activeSpot?.slug === s.slug;
+          const shortDateTag =
+            s.availabilityMode === 'one_time' && s.availableFromIso
+              ? new Date(s.availableFromIso).toLocaleDateString(lang === 'fa' ? 'fa-IR' : lang === 'nl' ? 'nl-NL' : 'en-GB', {
+                  day: 'numeric',
+                  month: 'short',
+                })
+              : null;
           return (
             <button
               key={s.id}
@@ -808,13 +914,29 @@ export const DirectNeighborShareView: React.FC<Props> = ({
               className={`min-h-[38px] px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all inline-flex items-center gap-1.5 ${
                 isSelected
                   ? 'bg-[#6E41C4] text-white border-[#6E41C4] shadow-xs'
-                  : 'bg-white text-slate-700 border-slate-200 hover:border-[#6E41C4]/40'
+                  : s.active
+                    ? 'bg-white text-slate-700 border-slate-200 hover:border-[#6E41C4]/40'
+                    : 'bg-slate-50 text-slate-400 border-slate-200/80'
               }`}
             >
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  s.active ? (isSelected ? 'bg-emerald-300' : 'bg-emerald-500') : 'bg-slate-300'
+                }`}
+              />
               <Car className="w-3.5 h-3.5" />
               <span>
                 {t(lang, `پلاک ${s.bayNumber}`, `Spot ${s.bayNumber}`, `Plek ${s.bayNumber}`)} · {s.floorOrZone}
               </span>
+              {shortDateTag && s.active && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                    isSelected ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900'
+                  }`}
+                >
+                  {shortDateTag}
+                </span>
+              )}
               {!s.active && (
                 <span className="text-[10px] opacity-80">
                   ({t(lang, 'متوقف', 'Paused', 'Gepauzeerd')})
@@ -871,35 +993,52 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                 </div>
               )}
 
-            {/* Quick Presets */}
-            <div className="space-y-1.5">
-              <div className="text-[11px] font-semibold text-slate-500">
-                {t(lang, 'انتخاب سریع:', 'Quick pick:', 'Snel kiezen:')}
-              </div>
+            {/* Quick Presets (Smart: adapts to one-time vs always-open spots!) */}
+            {activeSpot.availabilityMode === 'one_time' &&
+            activeSpot.availableFromIso &&
+            activeSpot.availableUntilIso ? (
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setQuickWindow(0, 14, 23)}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  onClick={() => {
+                    setStartLocal(toLocalDateTimeInputValue(new Date(activeSpot.availableFromIso!)));
+                    setEndLocal(toLocalDateTimeInputValue(new Date(activeSpot.availableUntilIso!)));
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-950"
                 >
-                  {t(lang, 'امروز ۱۴:۰۰–۲۳:۰۰', 'Today 14:00–23:00', 'Vandaag 14:00–23:00')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQuickWindow(1, 11, 18)}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
-                >
-                  {t(lang, 'فردا ۱۱:۰۰–۱۸:۰۰', 'Tomorrow 11:00–18:00', 'Morgen 11:00–18:00')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQuickWindow(1, 13, 13, true)}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
-                >
-                  {t(lang, 'شبانه‌روزی (۲۴ ساعت)', 'Full Day (24h)', 'Hele dag (24u)')}
+                  {t(lang, 'انتخاب کل بازه آزاد این پارکینگ', 'Select full available window', 'Hele beschikbare tijdvak kiezen')}
                 </button>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-semibold text-slate-500">
+                  {t(lang, 'انتخاب سریع:', 'Quick pick:', 'Snel kiezen:')}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setQuickWindow(0, 14, 23)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  >
+                    {t(lang, 'امروز ۱۴:۰۰–۲۳:۰۰', 'Today 14:00–23:00', 'Vandaag 14:00–23:00')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickWindow(1, 11, 18)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  >
+                    {t(lang, 'فردا ۱۱:۰۰–۱۸:۰۰', 'Tomorrow 11:00–18:00', 'Morgen 11:00–18:00')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickWindow(1, 13, 13, true)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  >
+                    {t(lang, 'شبانه‌روزی (۲۴ ساعت)', 'Full Day (24h)', 'Hele dag (24u)')}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Start & End Date-Time */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 min-w-0">
@@ -928,6 +1067,24 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                 />
               </label>
             </div>
+
+            {/* Live Instant Availability & Duration Pill */}
+            {liveTimeCheck && (
+              <div
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex flex-wrap items-center justify-between gap-2 border ${
+                  liveTimeCheck.ok
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                }`}
+              >
+                <span>{liveTimeCheck.ok ? `✓ ${liveTimeCheck.message}` : `⚠ ${liveTimeCheck.message}`}</span>
+                {liveTimeCheck.durationText && (
+                  <span className="font-mono text-[11px] px-2 py-0.5 rounded-md bg-white/80">
+                    {liveTimeCheck.durationText}
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Purpose */}
             <div className="flex flex-wrap items-center gap-2">
@@ -1155,12 +1312,18 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            setCancellingId(cancellingId === b.id ? null : b.id);
+                            const opening = cancellingId !== b.id;
+                            setCancellingId(opening ? b.id : null);
+                            if (opening && savedCancelCodes[b.id]) {
+                              setGuestCancelCode(savedCancelCodes[b.id]);
+                            }
                             setCancelFeedback(null);
                           }}
                           className="text-rose-600 hover:underline font-semibold"
                         >
-                          {t(lang, 'لغو با کد', 'Cancel with code', 'Annuleren met code')}
+                          {savedCancelCodes[b.id]
+                            ? t(lang, 'لغو رزرو من', 'Cancel my booking', 'Mijn reservering annuleren')
+                            : t(lang, 'لغو با کد', 'Cancel with code', 'Annuleren met code')}
                         </button>
                       </div>
 
