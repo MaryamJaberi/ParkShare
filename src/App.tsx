@@ -823,14 +823,14 @@ export default function App() {
                     buildingSlug: prev.buildingSlug || 'boston',
                   }));
                 }}
-                className={`inline-flex items-center justify-center gap-1.5 min-h-[38px] px-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                className={`inline-flex items-center justify-center gap-1.5 min-w-[38px] min-h-[38px] px-2.5 sm:px-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                   directShareRoute.active
                     ? 'bg-[#F46A46] text-white shadow-xs'
                     : 'bg-[#FFF1EC] text-[#C84321] border border-[#FFD6C9] hover:bg-[#FFE4DB]'
                 }`}
               >
                 <Car className="w-4 h-4 shrink-0" />
-                <span>
+                <span className="hidden sm:inline">
                   {directShareRoute.active
                     ? t(lang, 'بازگشت به ورود', 'Back to Login', 'Terug naar inloggen')
                     : t(lang, 'رزرو مستقیم (پلاک ۱۷۷)', 'Direct Share (Spot 177)', 'Direct delen (Plek 177)')}
