@@ -144,7 +144,7 @@ export const DirectNeighborShareView: React.FC<Props> = ({
   const [newOwnerName, setNewOwnerName] = useState('');
   const [newOwnerPhone, setNewOwnerPhone] = useState('');
   const [newOwnerPin, setNewOwnerPin] = useState('');
-  const [newAvailMode, setNewAvailMode] = useState<'one_time' | 'always'>('one_time');
+  const [newAvailMode, setNewAvailMode] = useState<'paused' | 'one_time' | 'always'>('paused');
   const [newAvailFrom, setNewAvailFrom] = useState(defaultStart);
   const [newAvailUntil, setNewAvailUntil] = useState(defaultEnd);
   const [newAvailNote, setNewAvailNote] = useState('');
@@ -432,7 +432,8 @@ export const DirectNeighborShareView: React.FC<Props> = ({
             ownerDisplayName: newOwnerName,
             ownerPhone: newOwnerPhone,
             ownerPin: newOwnerPin,
-            availabilityMode: newAvailMode,
+            availabilityMode: newAvailMode === 'always' ? 'always' : 'one_time',
+            startPaused: newAvailMode === 'paused',
             availableFromIso: newAvailMode === 'one_time' ? new Date(newAvailFrom).toISOString() : undefined,
             availableUntilIso: newAvailMode === 'one_time' ? new Date(newAvailUntil).toISOString() : undefined,
             availabilityNote: newAvailNote,
@@ -648,39 +649,29 @@ export const DirectNeighborShareView: React.FC<Props> = ({
 
   return (
     <div className="w-full min-w-0 max-w-[1120px] mx-auto space-y-6 pb-10">
-      {/* Top Bar Back + Quick Info */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Top Action Bar (Guide + Add My Spot — no confusing Back button!) */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
-          onClick={onBackToMain}
-          className="inline-flex items-center gap-2 min-h-[40px] px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50"
+          onClick={() => setShowGuide((v) => !v)}
+          className={`inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-bold rounded-xl border transition-colors ${
+            showGuide
+              ? 'bg-[#F5F1FD] border-[#6E41C4] text-[#5A2FA8]'
+              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+          }`}
         >
-          <ArrowLeft className={`w-4 h-4 ${lang === 'fa' || lang === 'ar' ? 'rotate-180' : ''}`} />
-          {t(lang, 'ورود مدیر / سامانه ساختمان', 'Building Manager Portal', 'Gebouwbeheerder portaal')}
+          <CalendarClock className="w-4 h-4" />
+          {t(lang, 'راهنمای قدم‌به‌قدم (رزرو و لغو)', 'Step-by-Step Guide (Book & Cancel)', 'Stappenplan (Boeken & Annuleren)')}
         </button>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowGuide((v) => !v)}
-            className={`inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-bold rounded-xl border transition-colors ${
-              showGuide
-                ? 'bg-[#F5F1FD] border-[#6E41C4] text-[#5A2FA8]'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <CalendarClock className="w-4 h-4" />
-            {t(lang, 'راهنمای قدم‌به‌قدم (رزرو و لغو)', 'Step-by-Step Guide (Book & Cancel)', 'Stappenplan (Boeken & Annuleren)')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowAddSpot(true)}
-            className="inline-flex items-center gap-1.5 min-h-[40px] px-4 py-2 text-xs font-bold text-white ps-violet-btn rounded-xl"
-          >
-            <Plus className="w-4 h-4" />
-            {t(lang, 'من هم پارکینگم را اضافه می‌کنم', 'Share My Spot Too', 'Mijn plek ook delen')}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowAddSpot(true)}
+          className="inline-flex items-center gap-1.5 min-h-[40px] px-4 py-2 text-xs font-bold text-white ps-violet-btn rounded-xl"
+        >
+          <Plus className="w-4 h-4" />
+          {t(lang, 'من هم پارکینگم را اضافه می‌کنم', 'Share My Spot Too', 'Mijn plek ook delen')}
+        </button>
       </div>
 
       {/* Step-by-Step Guide (How to Book, How to Cancel as Guest vs Owner, Fair-Use & Adding Your Spot) */}
@@ -1726,16 +1717,27 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                 </label>
               </div>
 
-              {/* One-Time vs Structural Choice (Prevents accidental permanent sharing!) */}
+              {/* Paused-first vs One-Time vs Structural Choice */}
               <div className="p-3.5 rounded-2xl bg-[#F8F6FD] border border-[#E6E0F7] space-y-2.5">
                 <div className="font-bold text-slate-900">
-                  {t(lang, 'چگونه می‌خواهید پارکینگتان را به اشتراک بگذارید؟', 'How do you want to share your spot?', 'Hoe wilt u uw plek aanbieden?')}
+                  {t(lang, 'چگونه می‌خواهید پارکینگتان را ثبت کنید؟', 'How do you want to register your spot?', 'Hoe wilt u uw plek instellen?')}
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewAvailMode('paused')}
+                    className={`py-2 px-2.5 rounded-xl font-bold border text-center ${
+                      newAvailMode === 'paused'
+                        ? 'bg-[#6E41C4] text-white border-[#6E41C4]'
+                        : 'bg-white text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {t(lang, 'فقط ثبت شود (فعلاً متوقف)', 'Register paused (share later)', 'Alleen registreren (later vrijgeven)')}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setNewAvailMode('one_time')}
-                    className={`py-2 px-3 rounded-xl font-bold border text-center ${
+                    className={`py-2 px-2.5 rounded-xl font-bold border text-center ${
                       newAvailMode === 'one_time'
                         ? 'bg-[#6E41C4] text-white border-[#6E41C4]'
                         : 'bg-white text-slate-700 border-slate-200'
@@ -1746,7 +1748,7 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => setNewAvailMode('always')}
-                    className={`py-2 px-3 rounded-xl font-bold border text-center ${
+                    className={`py-2 px-2.5 rounded-xl font-bold border text-center ${
                       newAvailMode === 'always'
                         ? 'bg-[#6E41C4] text-white border-[#6E41C4]'
                         : 'bg-white text-slate-700 border-slate-200'
@@ -1755,6 +1757,16 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                     {t(lang, 'همیشه آزاد (موقت)', 'Always open (temporary)', 'Doorlopend beschikbaar')}
                   </button>
                 </div>
+                {newAvailMode === 'paused' && (
+                  <p className="text-[11px] text-slate-600">
+                    {t(
+                      lang,
+                      'پارکینگ شما ذخیره می‌شود اما تا وقتی خودتان آن را آزاد نکنید هیچ‌کس نمی‌تواند رزرو کند.',
+                      'Your spot is saved paused — nobody can book it until you choose a date/time and activate it.',
+                      'Uw plek wordt gepauzeerd opgeslagen — niemand kan reserveren totdat u zelf een datum/tijd kiest en activeert.'
+                    )}
+                  </p>
+                )}
                 {newAvailMode === 'one_time' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                     <label className="space-y-1 block">

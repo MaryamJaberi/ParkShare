@@ -2416,6 +2416,7 @@ async function startServer() {
       ownerPhone,
       ownerPin,
       availabilityMode,
+      startPaused,
       availableFromIso,
       availableUntilIso,
       availabilityNote,
@@ -2465,6 +2466,7 @@ async function startServer() {
     }
 
     const buildingSlug = slugifyText(cleanBuilding.split(/\s+/)[0] || cleanBuilding) || 'boston';
+    const isStartPaused = Boolean(startPaused);
     const mode: 'always' | 'one_time' = availabilityMode === 'one_time' ? 'one_time' : 'always';
     let baseSlug = `${buildingSlug}-${slugifyText(cleanBay)}`;
     if (store.directSpots.some((s) => s.slug === baseSlug)) {
@@ -2477,9 +2479,9 @@ async function startServer() {
         baseSlug = `${baseSlug}-${suffix}`;
       } else {
         res.status(409).json({
-          errorNl: `Parkeerplek ${cleanBay} staat al doorlopend in ${cleanBuilding}. Kies “Eenmalig” voor een extra datum/tijd of pas de bestaande plek aan.`,
+          errorNl: `Parkeerplek ${cleanBay} staat al in ${cleanBuilding}. Kies “Eenmalig” voor een extra datum/tijd of pas de bestaande plek aan.`,
           errorEn: `Parking bay ${cleanBay} is already listed in ${cleanBuilding}. Choose "One-time" for an extra date/time or edit the existing spot.`,
-          errorFa: `پارکینگ ${cleanBay} قبلاً به‌صورت دائمی در ${cleanBuilding} ثبت شده است. برای تاریخ جدید حالت «یک‌باره» را انتخاب کنید یا پارکینگ قبلی را ویرایش کنید.`,
+          errorFa: `پارکینگ ${cleanBay} قبلاً در ${cleanBuilding} ثبت شده است. برای تاریخ جدید حالت «یک‌باره» را انتخاب کنید یا پارکینگ قبلی را ویرایش کنید.`,
         });
         return;
       }
@@ -2487,7 +2489,7 @@ async function startServer() {
 
     let safeFromIso: string | undefined;
     let safeUntilIso: string | undefined;
-    if (mode === 'one_time') {
+    if (mode === 'one_time' && !isStartPaused) {
       const fMs = Date.parse(String(availableFromIso ?? ''));
       const uMs = Date.parse(String(availableUntilIso ?? ''));
       if (!Number.isFinite(fMs) || !Number.isFinite(uMs) || uMs <= fMs) {
@@ -2521,10 +2523,12 @@ async function startServer() {
       availableUntilIso: safeUntilIso,
       availabilityNote:
         cleanNote ||
-        (mode === 'one_time'
-          ? 'Eenmalig beschikbaar binnen het aangegeven tijdvak (gratis voor buren)'
-          : 'Doorlopend beschikbaar voor tijdelijk gebruik / visite (gratis voor buren)'),
-      active: true,
+        (isStartPaused
+          ? 'Geregistreerd — wordt per keer vrijgegeven door de eigenaar'
+          : mode === 'one_time'
+            ? 'Eenmalig beschikbaar binnen het aangegeven tijdvak (gratis voor buren)'
+            : 'Doorlopend beschikbaar voor tijdelijk gebruik / visite (gratis voor buren)'),
+      active: !isStartPaused,
       fairUse: {
         maxHoursPerBooking: clampedMaxHours,
         maxDaysPerMonthPerGuest: clampedMaxDays,

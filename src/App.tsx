@@ -908,17 +908,42 @@ export default function App() {
               />
             </div>
           ) : (
-            <AuthView
-              lang={lang}
-              hasManager={hasManager}
-              hasSuperAdmin={hasSuperAdmin}
-              envAdminConfigured={envAdminConfigured}
-              isAdminRoute={isAdminRoute}
-              initialInviteToken={previewInviteToken ?? inviteToken}
-              onAuthenticated={handleAuthenticated}
-              onClearInviteToken={clearUrlInviteParam}
-              onExitAdminRoute={handleExitAdminRoute}
-            />
+            <div className="w-full max-w-5xl mx-auto space-y-4">
+              {!isAdminRoute && !previewInviteToken && !inviteToken && (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDirectShareRoute({
+                        active: true,
+                        spotSlug: directShareRoute.spotSlug || 'boston-177',
+                        buildingSlug: directShareRoute.buildingSlug || 'boston',
+                      })
+                    }
+                    className="inline-flex items-center gap-2 min-h-[42px] px-4 py-2 rounded-2xl bg-[#FFF1EC] text-[#C84321] border border-[#FFD6C9] hover:bg-[#FFE4DB] text-xs font-bold shadow-xs"
+                  >
+                    <Car className="w-4 h-4 shrink-0" />
+                    {t(
+                      lang,
+                      '← بازگشت به پارکینگ‌های اشتراکی همسایه‌ها (بوستون)',
+                      '← Back to Shared Neighbor Spots (Boston)',
+                      '← Terug naar gedeelde parkeerplekken (Boston)'
+                    )}
+                  </button>
+                </div>
+              )}
+              <AuthView
+                lang={lang}
+                hasManager={hasManager}
+                hasSuperAdmin={hasSuperAdmin}
+                envAdminConfigured={envAdminConfigured}
+                isAdminRoute={isAdminRoute}
+                initialInviteToken={previewInviteToken ?? inviteToken}
+                onAuthenticated={handleAuthenticated}
+                onClearInviteToken={clearUrlInviteParam}
+                onExitAdminRoute={handleExitAdminRoute}
+              />
+            </div>
           )}
         </main>
       </div>
