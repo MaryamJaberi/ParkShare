@@ -819,7 +819,7 @@ export const DirectNeighborShareView: React.FC<Props> = ({
           {/* LEFT: Instant Temporary Booking Form */}
           <form
             onSubmit={handleBook}
-            className="lg:col-span-7 bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 ps-card-shadow space-y-5"
+            className="lg:col-span-7 bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 ps-card-shadow space-y-5 overflow-hidden [&_input]:text-base sm:[&_input]:text-sm [&_input]:max-w-full [&_input]:min-w-0 [&_input]:box-border"
           >
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
@@ -876,8 +876,8 @@ export const DirectNeighborShareView: React.FC<Props> = ({
             </div>
 
             {/* Start & End Date-Time */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <label className="space-y-1.5 block">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 min-w-0">
+              <label className="space-y-1.5 block min-w-0">
                 <span className="text-xs font-semibold text-slate-700">
                   {t(lang, 'از تاریخ و ساعت', 'Start Date & Time', 'Begindatum & tijd')}
                 </span>
@@ -886,10 +886,10 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                   required
                   value={startLocal}
                   onChange={(e) => setStartLocal(e.target.value)}
-                  className="w-full h-11 px-3 text-sm bg-white border border-slate-200 rounded-xl text-slate-900"
+                  className="w-full max-w-full min-w-0 box-border h-11 px-3 text-base sm:text-sm bg-white border border-slate-200 rounded-xl text-slate-900"
                 />
               </label>
-              <label className="space-y-1.5 block">
+              <label className="space-y-1.5 block min-w-0">
                 <span className="text-xs font-semibold text-slate-700">
                   {t(lang, 'تا تاریخ و ساعت', 'End Date & Time', 'Einddatum & tijd')}
                 </span>
@@ -898,7 +898,7 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                   required
                   value={endLocal}
                   onChange={(e) => setEndLocal(e.target.value)}
-                  className="w-full h-11 px-3 text-sm bg-white border border-slate-200 rounded-xl text-slate-900"
+                  className="w-full max-w-full min-w-0 box-border h-11 px-3 text-base sm:text-sm bg-white border border-slate-200 rounded-xl text-slate-900"
                 />
               </label>
             </div>
@@ -1458,8 +1458,8 @@ export const DirectNeighborShareView: React.FC<Props> = ({
 
       {/* Modal: Any Neighbor Can Add Their Own Spot */}
       {showAddSpot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="w-full max-w-lg bg-white rounded-3xl border border-slate-200 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+          <div className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 p-5 sm:p-6 space-y-4 max-h-[88dvh] overflow-y-auto overflow-x-hidden">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-base font-extrabold text-slate-900">
                 {t(lang, 'پارکینگ خود را به اشتراک بگذارید', 'Add Your Parking Spot to Share', 'Uw eigen parkeerplek toevoegen')}
@@ -1473,7 +1473,7 @@ export const DirectNeighborShareView: React.FC<Props> = ({
               </button>
             </div>
 
-            <form onSubmit={handleAddSpot} className="space-y-3.5 text-xs">
+            <form onSubmit={handleAddSpot} className="space-y-3.5 text-xs [&_input]:text-base sm:[&_input]:text-sm [&_input]:max-w-full [&_input]:min-w-0 [&_input]:box-border">
               <div className="grid grid-cols-2 gap-3">
                 <label className="space-y-1 block">
                   <span className="font-semibold text-slate-700">{t(lang, 'شماره پارکینگ (یا چند شماره با کاما) *', 'Bay Number(s) *', 'Pleknummer(s) *')}</span>
