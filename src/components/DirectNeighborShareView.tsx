@@ -291,35 +291,52 @@ export const DirectNeighborShareView: React.FC<Props> = ({
     setAddSpotError(null);
     setAddingSpot(true);
     try {
-      const res = await fetch('/api/direct/spots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          buildingName: newBuilding,
-          bayNumber: newBay,
-          floorOrZone: newFloor,
-          ownerDisplayName: newOwnerName,
-          ownerPhone: newOwnerPhone,
-          ownerPin: newOwnerPin,
-          availabilityMode: newAvailMode,
-          availableFromIso: newAvailMode === 'one_time' ? new Date(newAvailFrom).toISOString() : undefined,
-          availableUntilIso: newAvailMode === 'one_time' ? new Date(newAvailUntil).toISOString() : undefined,
-          availabilityNote: newAvailNote,
-          maxHoursPerBooking: newMaxHours,
-          maxDaysPerMonthPerGuest: newMaxDays,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setAddSpotError(
-          pickLocalizedError(
-            data,
-            lang,
-            t(lang, 'خطا در ثبت پارکینگ.', 'Could not add spot.', 'Kan plek niet toevoegen.')
-          )
-        );
+      const bayNumbers = newBay
+        .split(/[,،;\n]+/)
+        .map((b) => b.trim())
+        .filter(Boolean);
+      if (bayNumbers.length === 0) {
+        setAddSpotError(t(lang, 'شماره پارکینگ را وارد کنید.', 'Please enter at least one bay number.', 'Vul minimaal één pleknummer in.'));
         return;
       }
+
+      let lastSlug: string | null = null;
+      for (const singleBay of bayNumbers) {
+        const res = await fetch('/api/direct/spots', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            buildingName: newBuilding,
+            bayNumber: singleBay,
+            floorOrZone: newFloor,
+            ownerDisplayName: newOwnerName,
+            ownerPhone: newOwnerPhone,
+            ownerPin: newOwnerPin,
+            availabilityMode: newAvailMode,
+            availableFromIso: newAvailMode === 'one_time' ? new Date(newAvailFrom).toISOString() : undefined,
+            availableUntilIso: newAvailMode === 'one_time' ? new Date(newAvailUntil).toISOString() : undefined,
+            availabilityNote: newAvailNote,
+            maxHoursPerBooking: newMaxHours,
+            maxDaysPerMonthPerGuest: newMaxDays,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setAddSpotError(
+            pickLocalizedError(
+              data,
+              lang,
+              t(lang, 'خطا در ثبت پارکینگ.', 'Could not add spot.', 'Kan plek niet toevoegen.')
+            )
+          );
+          await loadDirectData();
+          return;
+        }
+        if (data.spot?.slug) {
+          lastSlug = data.spot.slug;
+        }
+      }
+
       setShowAddSpot(false);
       setNewBay('');
       setNewOwnerName('');
@@ -327,8 +344,8 @@ export const DirectNeighborShareView: React.FC<Props> = ({
       setNewOwnerPin('');
       setNewAvailNote('');
       await loadDirectData();
-      if (data.spot?.slug) {
-        setSelectedSlug(data.spot.slug);
+      if (lastSlug) {
+        setSelectedSlug(lastSlug);
       }
     } catch {
       setAddSpotError(t(lang, 'خطای شبکه.', 'Network error.', 'Netwerkfout.'));
@@ -1448,15 +1465,18 @@ export const DirectNeighborShareView: React.FC<Props> = ({
             <form onSubmit={handleAddSpot} className="space-y-3.5 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <label className="space-y-1 block">
-                  <span className="font-semibold text-slate-700">{t(lang, 'شماره پارکینگ *', 'Bay Number *', 'Pleknummer *')}</span>
+                  <span className="font-semibold text-slate-700">{t(lang, 'شماره پارکینگ (یا چند شماره با کاما) *', 'Bay Number(s) *', 'Pleknummer(s) *')}</span>
                   <input
                     type="text"
                     required
                     value={newBay}
                     onChange={(e) => setNewBay(e.target.value)}
-                    placeholder="bijv. 220"
+                    placeholder="bijv. 204 of 204, 205"
                     className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl"
                   />
+                  <span className="text-[10px] text-slate-500 block">
+                    {t(lang, 'چند پارکینگ دارید؟ با کاما جدا کنید (مثلاً 204, 205)', 'Multiple spots? Separate with commas (e.g. 204, 205)', 'Meerdere plekken? Scheid met een komma (bijv. 204, 205)')}
+                  </span>
                 </label>
                 <label className="space-y-1 block">
                   <span className="font-semibold text-slate-700">{t(lang, 'طبقه *', 'Floor *', 'Verdieping *')}</span>
