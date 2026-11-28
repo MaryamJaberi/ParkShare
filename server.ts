@@ -189,6 +189,16 @@ function loadStore(): ParkShareStore {
           b177.ownerDisplayName = 'Maryam (P5 · Plek 177)';
         }
       }
+      // Clean up accidental duplicate boston-204-2 requested by owner
+      const beforeLen = merged.directSpots.length;
+      merged.directSpots = merged.directSpots.filter((s) => s.slug !== 'boston-204-2');
+      if (merged.directSpots.length !== beforeLen) {
+        try {
+          fs.writeFileSync(STORE_PATH, JSON.stringify(merged, null, 2), 'utf8');
+        } catch {
+          // ignore
+        }
+      }
     }
     if (!Array.isArray(merged.directBookings)) {
       merged.directBookings = [];
@@ -2917,6 +2927,20 @@ async function startServer() {
 
     store.directSpots = store.directSpots.filter((s) => s.id !== spot.id);
     store.directBookings = store.directBookings.filter((b) => b.spotId !== spot.id);
+    saveStore();
+    res.json({ ok: true });
+  });
+
+  // D6c. Super Admin: Remove any duplicate or orphaned Direct Spot
+  app.delete('/api/admin/direct-spots/:slug', requireAuth, requireSuperAdmin, (req, res) => {
+    const slug = String(req.params.slug ?? '').toLowerCase();
+    const target = store.directSpots.find((s) => s.slug === slug);
+    if (!target) {
+      res.status(404).json({ error: 'Spot not found' });
+      return;
+    }
+    store.directSpots = store.directSpots.filter((s) => s.id !== target.id);
+    store.directBookings = store.directBookings.filter((b) => b.spotId !== target.id);
     saveStore();
     res.json({ ok: true });
   });
