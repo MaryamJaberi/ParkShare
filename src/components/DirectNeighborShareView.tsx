@@ -205,6 +205,18 @@ export const DirectNeighborShareView: React.FC<Props> = ({
     [spots, selectedSlug]
   );
 
+  // Auto-align booking start/end pickers to a one-time spot's exact available window
+  useEffect(() => {
+    if (
+      activeSpot?.availabilityMode === 'one_time' &&
+      activeSpot.availableFromIso &&
+      activeSpot.availableUntilIso
+    ) {
+      setStartLocal(toLocalDateTimeInputValue(new Date(activeSpot.availableFromIso)));
+      setEndLocal(toLocalDateTimeInputValue(new Date(activeSpot.availableUntilIso)));
+    }
+  }, [activeSpot?.id, activeSpot?.availabilityMode, activeSpot?.availableFromIso, activeSpot?.availableUntilIso]);
+
   const activeSpotBookings = useMemo(
     () =>
       activeSpot
@@ -844,6 +856,20 @@ export const DirectNeighborShareView: React.FC<Props> = ({
                 {t(lang, 'رایگان', 'Free', 'Gratis')}
               </span>
             </div>
+
+            {/* Show exact allowed window right inside the form for one-time spots */}
+            {activeSpot.availabilityMode === 'one_time' &&
+              activeSpot.availableFromIso &&
+              activeSpot.availableUntilIso && (
+                <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex flex-wrap items-center gap-1.5">
+                  <CalendarClock className="w-4 h-4 shrink-0" />
+                  <span>
+                    {t(lang, 'بازه مجاز این پارکینگ:', 'Allowed window for this spot:', 'Beschikbaar tijdvak voor deze plek:')}{' '}
+                    {formatDateTime(activeSpot.availableFromIso, lang)} →{' '}
+                    {formatDateTime(activeSpot.availableUntilIso, lang)}
+                  </span>
+                </div>
+              )}
 
             {/* Quick Presets */}
             <div className="space-y-1.5">
